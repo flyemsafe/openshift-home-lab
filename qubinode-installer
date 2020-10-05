@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+set -E
+set -o functrace
+
+# Define colours
+red=$'\e[1;31m'
+grn=$'\e[1;32m'
+yel=$'\e[1;33m'
+blu=$'\e[1;34m'
+mag=$'\e[1;35m'
+cyn=$'\e[1;36m'
+def=$'\e[1;49m'
+end=$'\e[0m'
+
+# define formatting
+txend=$(tput sgr0)   # reset attributes
+txb=$(tput bold)   # bold
+txu=$(tput smul)   # underline
+txuend=$(tput rmul)   # exit underline
+
+# Define Header
+divider===============================
+divider=$divider$divider
+header="\n %-035s %010s\n"
+format=" %-035s %010s\n"
+width=50
+
+
+# Uncomment for debugging
+#export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+#set -x
+
+# Turn verbose off
+_V=1
+
+function config_err_msg () {
+    cat << EOH >&2
+  There was an error finding the full path to the qubinode-installer project directory.
+EOH
+}
+
+# this function just make sure the script
+# knows the full path to the project directory
+# and runs the config_err_msg if it can't determine
+# that start_deployment.conf can find the project directory
+function setup_required_paths () {
+    project_dir="`dirname \"$0\"`"
+    project_dir="`( cd \"$project_dir\" && pwd )`"
+    if [ -z "$project_dir" ] ; then
+        config_err_msg; exit 1
+    fi
+
+    if [ ! -d "${project_dir}/playbooks/vars" ] ; then
+        config_err_msg; exit 1
+    fi
+}
+
+##       MAIN               ##
+##############################
+
+# load pre functions
+teardown="false"
+CURRENT_USER=$(whoami)
+rhel_major=$(sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release)
+CHECK_PULL_SECRET=no
+setup_required_paths
+
+### Create qubinode configuration directory and copy all lib
+### from the project directory to this location
+#QUBINODE_LIBS_DIR=/usr/local/etc/qubinode/libs
+#test -d "${QUBINODE_LIBS_DIR}" && mkdir -p "${QUBINODE_LIBS_DIR}"
+#chown -R $CURRENT_USER $QUBINODE_LIBS_DIR
+#
+### copy over all libs
+#if which rsync > /dev/null
+#then
+#  rsync -a "${project_dir}/lib/" "${QUBINODE_LIBS_DIR}/"
+#else
+#  cp -a "${project_dir}/lib" "${QUBINODE_LIBS_DIR}"
+#fi
+
+
+# Include all required functions
+. "${project_dir}/lib/qubinode_menu_welcome.sh"
+. "${project_dir}/lib/qubinode_installer_prereqs.sh"
+. "${project_dir}/lib/qubinode_utils.sh"
+. "${project_dir}/lib/qubinode_menu_options.sh"
+. "${project_dir}/lib/setup_sudo.sh"
+. "${project_dir}/lib/qubinode_userinput.sh"
+. "${project_dir}/lib/qubinode_kvmhost.sh"
+. "${project_dir}/lib/qubinode_requirements.sh"
+. "${project_dir}/lib/qubinode_idm.sh"
+. "${project_dir}/lib/qubinode_ansible.sh"
+. "${project_dir}/lib/qubinode_rhsm.sh"
+. "${project_dir}/lib/qubinode_ocp4_utils.sh"
+. "${project_dir}/lib/qubinode_ocp4.sh"
+. "${project_dir}/lib/qubinode_satellite.sh"
+. "${project_dir}/lib/qubinode_tower.sh"
+. "${project_dir}/lib/qubinode_rhel.sh"
+
+
+# Exit if this is executed as the root user
+if is_root; then
+    echo "Error: qubi-installer should be run as a normal user, not as root!"
+    exit 1
+fi
+
+echo ""
+echo ""
+OPTIND=1
+NUM_ARGS="$#"
+ALL_ARGS="$@"
+
+while getopts ":c:dvhm:p:a:" opt;
+do
+    case $opt in
+        a) check_args;
+           full_deploy=true
+           product_options+=("$OPTARG")
+           ;;
+        c) check_args
+           check=true
+           cluster=true
+           cluster_opt=$OPTARG
+           ;;
+        d) check_args;
+           teardown=true
+           ;;
+        h) display_help
+           exit 1
+           ;;
+        m) check_args;
+           qubinode_maintenance=true
+           qubinode_maintenance_opt=$OPTARG;
+           ;;
+        p) check_args
+           check=true
+           qubinode_product=true
+           qubinode_product_opt=$OPTARG
+           ;;
+        v) check_args;
+           _V=1
+           ;;
+       --) shift; break;;
+       -*) echo Unrecognized flag : "$1" >&2
+           display_help
+           exit 1
+           ;;
+       \?) echo Unrecognized flag : "$1" >&2
+           display_help
+           exit 1
+           ;;
+    esac
+done
+shift "$((OPTIND-1))"
+
+# If not arguments pass, run default option to install OpenShift
+if (( $OPTIND == 1 ))
+then
+    display_openshift_msg_ocp4
+elif [ "A${qubinode_product}" == "Atrue" ] && [ "A${qubinode_maintenance}" == "Atrue" ]
+then
+    product_maintenance="${qubinode_maintenance_opt}"
+    qubinode_product_deployment $qubinode_product_opt
+elif [ "A${qubinode_maintenance}" == "Atrue" ]
+then
+    qubinode_maintenance_options
+elif [ "A${qubinode_product}" == "Atrue" ]
+then
+    qubinode_product_deployment $qubinode_product_opt
+else
+    display_help
+fi
+
+exit 0

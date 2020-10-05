@@ -1,0 +1,9 @@
+localhost               ansible_connection=local ansible_user=root
+
+[ipaserver]
+
+[satellite]
+
+[tower]
+
+[rhel]
