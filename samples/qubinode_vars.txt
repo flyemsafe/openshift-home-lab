@@ -1,0 +1,58 @@
+## not root user
+ADMIN_USER="${CURRENT_USER}"
+
+##---------------------------------------------------------------------
+## Variables for bridge network interface / set to override installer
+##---------------------------------------------------------------------
+PRIMARY_DISK="${primary_disk}"
+NETWORK_DEVICE="${netdevice}"
+IPADDRESS="${ipaddress}"
+GATEWAY="${gateway}"
+NETWORK="${network}"
+MACADDR="${macaddr}"
+
+##---------------------------------------------------------------------
+## Varibles for DNS server
+##---------------------------------------------------------------------
+REVERSE_ZONE="${reverse_zone}"
+DOMAIN="${DOMAIN}"
+DEPLOY_IDM="${DEPLOY_IDM}"
+IDM_SERVER_HOSTNAME="${_IDM_SERVER_HOSTNAME}"
+IDM_ADMIN_USER="${_IDM_ADMIN_USER}"
+ALLOW_ZONE_OVERLAP="${ALLOW_ZONE_OVERLAP}"
+IDM_SERVER_IP="${IDM_SERVER_IP}"
+USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP}"
+IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD}"
+DEPLOY_NEW_IDM="${DEPLOY_NEW_IDM}"
+
+##---------------------------------------------------------------------
+## Libvirt variables
+##---------------------------------------------------------------------
+LIBVIRT_DIR="${LIBVIRT_DIR}"
+LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK}"
+CREATE_LIBVIRT_LVM="${CREATE_LIBVIRT_LVM}"
+
+##---------------------------------------------------------------------
+## Varibles for RHSM
+##---------------------------------------------------------------------
+RHSM_SYSTEM="${RHSM_SYSTEM}"
+RHEL_RELEASE="${rhel_release}"
+RHEL_MAJOR="${rhel_major}"
+SYSTEM_REGISTERED="${SYSTEM_REGISTERED}"
+RHSM_REG_METHOD="${RHSM_REG_METHOD}"
+
+##---------------------------------------------------------------------
+## DO NOT CHANGE THESE
+##---------------------------------------------------------------------
+ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED}"
+PYTHON3_INSTALLED="${PYTHON3_INSTALLED}"
+ALL_DISK="${ALL_DISK}"
+ALL_INTERFACES="${ALL_INTERFACES}"
+OS_NAME=${os_name}
+VAULT_FILE="${VAULT_FILE}"
+VERIFIED_NETWORKING="${VERIFIED_NETWORKING}"
+QUBINODE_ANSIBLE_VARS="${QUBINODE_ANSIBLE_VARS}"
+yum_packages="python3-pyyaml python3 python3-pip python3-dns ansible git podman python-podman-api toolbox"
+rhel7_packages="python python3-pip python2-pip python-dns"
+pip_packages="yml2json"
+rhel8_repos="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"

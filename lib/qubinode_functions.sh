@@ -689,7 +689,7 @@ function ask_about_idm() {
 		    USE_EXISTING_IDM=no
 		fi
             else
-                printf "%s\n" "  You can change configuration options $QUBINODE_VARS"
+                printf "%s\n" "  You can change configuration options $QUBINODE_BASH_VARS"
                 printf "%s\n" "  and run the installer again."
             fi
 	    ;;
@@ -776,7 +776,7 @@ function ask_about_idm() {
 ## KVM HOST SETUP
 ##---------------------------------------------------------------------
 function install_packages () {
-   # install python
+    # install python
     if [ "A${PYTHON3_INSTALLED}" == "Ano" -o "A${ANSIBLE_INSTALLED}" == "Ano" ]
     then
         printf "%s\n" "  ${blu}***********************************************************${end}"
@@ -785,7 +785,7 @@ function install_packages () {
         then
 	    ENABLED_REPOS=$(mktemp)
 	    sudo subscription-manager repos --list-enabled > "${ENABLED_REPOS}"
-	    for repo in $(echo rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms)
+	    for repo in $(echo "$rhel8_repos")
 	    do
                 if ! grep -q $repo "${ENABLED_REPOS}"
 		then
@@ -795,14 +795,15 @@ function install_packages () {
 	fi
 
 	## RHEL7
-        if [[ $RHEL_MAJOR == "7" ]]; then
+        if [[ $RHEL_MAJOR == "7" ]]
+	then
             if [ ! -f /usr/bin/python ]
             then
                 printf "%s\n" "   ${yel}Installing required rpms..${end}"
                 sudo yum clean all > /dev/null 2>&1
-                sudo yum install -y -q -e 0 python python3-pip python2-pip python-dns ansible git podman python-podman-api toolbox
+                sudo yum install -y -q -e 0 "$rhel7_packages" "$yum_packages"> /dev/null 2>&1
             fi
-	 fi
+	fi
 
 	 ## Install on RHEL8 and fedora
 	 if [[ "A${OS_NAME}" == "AFedora" ]] || [[ "$RHEL_MAJOR" == "8" ]]
@@ -810,16 +811,27 @@ function install_packages () {
              printf "%s\n" "   ${yel}Installing required python rpms..${end}"
              sudo yum clean all > /dev/null 2>&1
              sudo rm -r /var/cache/dnf
-             sudo yum install -y -q -e 0 python3 python3-pip python3-dns ansible git podman python-podman-api toolbox> /dev/null 2>&1
+             sudo yum install -y -q -e 0 "$yum_packages"> /dev/null 2>&1
 	 fi
-
-        ## check if python3 is installed
-        if which python3> /dev/null 2>&1
-        then
-          PYTHON3_INSTALLED=yes
-        else
-          PYTHON3_INSTALLED=no
-        fi
     fi
 
+    ## check if python3 is installed
+    if which python3> /dev/null 2>&1
+    then
+        PYTHON3_INSTALLED=yes
+    else
+        PYTHON3_INSTALLED=no
+    fi
+
+    ## install pip3 packages
+    if which /usr/bin/pip3 > /dev/null 2>&1
+    then
+	for pkg in $(echo $pip_packages)
+	do
+	    if ! pip3 list --format=legacy| grep $pkg > /dev/null 2>&1
+            then
+                /usr/bin/pip3 install $pkg --user
+	    fi
+        done
+    fi
 }
