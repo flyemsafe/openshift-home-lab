@@ -286,6 +286,9 @@ function check_rhsm_status () {
     SYSTEM_REGISTERED=no
     if [ "A${RHSM_SYSTEM}" == 'Ayes' ]
     then
+        printf "%s\n" ""
+        printf "%s\n" "  ${blu}Confirming System Registration Status${end}"
+        printf "%s\n" "  ${blu}***********************************************************${end}"
 	if sudo subscription-manager status | grep -q 'Overall Status: Current'
         then
 	    SYSTEM_REGISTERED=yes
@@ -758,6 +761,7 @@ function ask_about_idm() {
     fi
 
     ## allow-zone-overlap
+    ALLOW_ZONE_OVERLAP=no
     if [ "A${ALLOW_ZONE_OVERLAP}" == "A" -a "A${ALLOW_ZONE_OVERLAP}" == 'A""' ]
     then
         printf "%s\n" "  You can safely choose no for this next question."
@@ -766,8 +770,6 @@ function ask_about_idm() {
         if [ "A${response}" == "Ayes" ]
         then
              ALLOW_ZONE_OVERLAP=yes
-        else
-             ALLOW_ZONE_OVERLAP=no
         fi
     fi
 }

@@ -144,14 +144,6 @@ printf "\nEOF";
 ) >"$TMP_BASH_VARS_FILE"
 . "$TMP_BASH_VARS_FILE"
 
-## Merge any user added entries
-if ! cmp "$CURRENT_BASH_VARS_FILE" "$QUBINODE_BASH_VARS" >/dev/null 2>&1
-then
-    MERGED_FILE=$(mktemp)
-    diff -DVERSION1 "$CURRENT_BASH_VARS_FILE" "$QUBINODE_BASH_VARS" > "$MERGED_FILE"
-    grep -v '^#if' "$MERGED_FILE" | grep -v '^#endif' > "$QUBINODE_BASH_VARS"
-fi
-
 ## Generate ansible vars yaml template
 ANSIBLE_TEMPLATE=$(mktemp)
 TMP_ANSIBLE_FILE=$(mktemp)
@@ -171,6 +163,14 @@ printf "\nEOF";
 sed -i 's#^[[:alpha:]].*:#\L&#g' "$QUBINODE_ANSIBLE_VARS"
 sed -i 's/"yes"/yes/g' "$QUBINODE_ANSIBLE_VARS"
 sed -i 's/"no"/no/g' "$QUBINODE_ANSIBLE_VARS"
+
+## Merge any user added entries
+if ! cmp "$CURRENT_BASH_VARS_FILE" "$QUBINODE_BASH_VARS" >/dev/null 2>&1
+then
+    MERGED_FILE=$(mktemp)
+    diff -DVERSION1 "$CURRENT_BASH_VARS_FILE" "$QUBINODE_BASH_VARS" > "$MERGED_FILE"
+    grep -v '^#if' "$MERGED_FILE" | grep -v '^#endif' | grep -v '^#else' > "$QUBINODE_BASH_VARS"
+fi
 
 ## Generate JSON for future use
 yml2json "$QUBINODE_ANSIBLE_VARS" --pretty --output "$QUBINODE_ANSIBLE_JSON"

@@ -23,7 +23,6 @@ ALLOW_ZONE_OVERLAP="${ALLOW_ZONE_OVERLAP}"
 IDM_SERVER_IP="${IDM_SERVER_IP}"
 USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP}"
 IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD}"
-DEPLOY_NEW_IDM="${DEPLOY_NEW_IDM}"
 
 ##---------------------------------------------------------------------
 ## Libvirt variables
