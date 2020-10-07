@@ -1,26 +1,25 @@
 #!/bin/bash
 
-function config_err_msg () {
-    cat << EOH >&2
-  There was an error finding the full path to the qubinode-installer project directory.
-EOH
-}
+## This contains the majority of the functions required to
+## get the system to a state where ansible and python is available
 
-# this function just make sure the script
-# knows the full path to the project directory
-# and runs the config_err_msg if it can't determine
-# that start_deployment.conf can find the project directory
-function setup_required_paths () {
-    project_dir="`dirname \"$0\"`"
-    project_dir="`( cd \"$project_dir\" && pwd )`"
-    if [ -z "$project_dir" ] ; then
-        config_err_msg; exit 1
-    fi
-
-    if [ ! -d "${project_dir}/playbooks/vars" ] ; then
-        config_err_msg; exit 1
-    fi
-}
+#function config_err_msg () {
+#    cat << EOH >&2
+#  There was an error finding the full path to the qubinode-installer project directory.
+#EOH
+#}
+#
+## this function just make sure the script
+## knows the full path to the project directory
+## and runs the config_err_msg if it can't determine
+## that start_deployment.conf can find the project directory
+#function setup_required_paths () {
+#    project_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+#
+#    if [ ! -d "${project_dir}/playbooks/vars" ] ; then
+#        printf "%s\n" "  ${red}There was an error finding the full path to the qubinode-installer project directory${end}"
+#    fi
+#}
 
 
 ##---------------------------------------------------------------------
@@ -63,51 +62,52 @@ function elevate_cmd () {
     esac
 }
 
-function setup_sudoers () {
+function setup_sudoers () 
+{
    printf "%s\n" ""
    printf "%s\n" "     ${txu}${txb}Setup Sudoers${txend}${txuend}"
    printf "%s\n" " The qubinode-installer runs as a normal user. It sets up"
    printf "%s\n" " your current user account for passwordless sudo."
    printf "%s\n" ""
    SUDOERS_TMP=$(mktemp)
-   echo "${CURRENT_USER} ALL=(ALL) NOPASSWD:ALL" > "${SUDOERS_TMP}"
-   elevate_cmd test -f "/etc/sudoers.d/${CURRENT_USER}"
-   sudo cp "${SUDOERS_TMP}" "/etc/sudoers.d/${CURRENT_USER}"
-   sudo chmod 0440 "/etc/sudoers.d/${CURRENT_USER}"
+   echo "${ADMIN_USER} ALL=(ALL) NOPASSWD:ALL" > "${SUDOERS_TMP}"
+   elevate_cmd test -f "/etc/sudoers.d/${ADMIN_USER}"
+   sudo cp "${SUDOERS_TMP}" "/etc/sudoers.d/${ADMIN_USER}"
+   sudo chmod 0440 "/etc/sudoers.d/${ADMIN_USER}"
 }
 
 ##---------------------------------------------------------------------
 ## Get Storage Information
 ##---------------------------------------------------------------------
-function getPrimaryDisk () {
-    if which lsblk >/dev/null 2>&1
+function getPrimaryDisk () 
+{
+    primary_disk="${PRIMARY_DISK:-none}"
+    if [ "A${primary_disk}" == "Anone" ]
     then
-        declare -a DISKS=()
-        dev=$(eval $(lsblk -oMOUNTPOINT,PKNAME -P| \
-		grep 'MOUNTPOINT="/"'); echo $PKNAME | sed 's/[0-9]*$//')
-        PRIMARY_DISK_FOUND=no
-        ALL_DISK=""
-        if [ "A${dev}" != "A" ];
+        if which lsblk >/dev/null 2>&1
         then
-           PRIMARY_DISK_FOUND=yes
-           if [[ "A${PRIMARY_DISK}" == "A" ]] || [[ "A${PRIMARY_DISK}" == 'A""' ]]
-           then
+            declare -a DISKS=()
+            dev=$(eval $(lsblk -oMOUNTPOINT,PKNAME -P| \
+                grep 'MOUNTPOINT="/"'); echo $PKNAME | sed 's/[0-9]*$//')
+            if [ "A${dev}" != "A" ];
+            then
                primary_disk="$dev"
-           else
-               primary_disk="${PRIMARY_DISK}"
-           fi
-           mapfile -t DISKS < <(lsblk -dp | \
-               grep -o '^/dev[^ ]*'|awk -F'/' '{print $3}' | \
-               grep -v ${primary_disk})
-           ALL_DISK="${DISKS[@]}"
+	    fi
         fi
     fi
+
+    ## get all available disk
+    mapfile -t DISKS < <(lsblk -dp | \
+        grep -o '^/dev[^ ]*'|awk -F'/' '{print $3}' | \
+        grep -v ${primary_disk})
+    ALL_DISK="${DISKS[@]}"
 }
 
 ##---------------------------------------------------------------------
 ## Get network information
 ##---------------------------------------------------------------------
-get_primary_interface () {
+get_primary_interface () 
+{
     ## Get all interfaces except wireless and bridge
     declare -a INTERFACES=()
     mapfile -t INTERFACES < <(ip link | \
@@ -115,42 +115,42 @@ get_primary_interface () {
 	    sed -e 's/^[[:space:]]*//')
     ALL_INTERFACES="${INTERFACES[@]}"
     
-    if [[ "A${NETWORK_DEVICE}" == "A" ]] || [[ "A${NETWORK_DEVICE}" == 'A""' ]]
+    if [[ "A${NETWORK_DEVICE-}" == "A" ]] || [[ "A${NETWORK_DEVICE-}" == 'A""' ]]
     then
         netdevice=$(ip route get 8.8.8.8 | awk -- '{printf $5}')
     else
-        netdevice="${NETWORK_DEVICE}"
+        netdevice="${NETWORK_DEVICE-}"
     fi
 
-    if [[ "A${IPADDRESS}" == "A" ]] || [[ "A${IPADDRESS}" == 'A""' ]]
+    if [[ "A${IPADDRESS-}" == "A" ]] || [[ "A${IPADDRESS-}" == 'A""' ]]
     then
         ipaddress=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
     else
-        ipaddress="${IPADDRESS}"
+        ipaddress="${IPADDRESS-}"
     fi
 
-    if [[ "A${GATEWAY}" == "A" ]] || [[ "A${GATEWAY}" == 'A""' ]]
+    if [[ "A${GATEWAY-}" == "A" ]] || [[ "A${GATEWAY-}" == 'A""' ]]
     then
         gateway=$(ip route get 8.8.8.8 | awk -F"via " 'NR==1{split($2,a," ");print a[1]}')
     else
-        gateway="${GATEWAY}"
+        gateway="${GATEWAY-}"
     fi
 
-    if [[ "A${NETWORK}" == "A" ]] || [[ "A${NETWORK}" == 'A""' ]]
+    if [[ "A${NETWORK-}" == "A" ]] || [[ "A${NETWORK-}" == 'A""' ]]
     then
         network=$(ip route | awk -F'/' "/$ipaddress/ {print \$1}")
     else
-        network="${NETWORK}"
+        network="${NETWORK-}"
     fi
 
-    if [[ "A${REVERSE_ZONE}" == "A" ]] || [[ "A${REVERSE_ZONE}" == 'A""' ]]
+    if [[ "A${REVERSE_ZONE-}" == "A" ]] || [[ "A${REVERSE_ZONE-}" == 'A""' ]]
     then
         reverse_zone=$(echo "$network" | awk -F . '{print $4"."$3"."$2"."$1".in-addr.arpa"}'| sed 's/^[^.]*.//g')
     else
-        reverse_zone="${REVERSE_ZONE}"
+        reverse_zone="${REVERSE_ZONE-}"
     fi
 
-    if [[ "A${NETWORK_DEVICE}" == "A" ]] || [[ "A${NETWORK_DEVICE}" == 'A""' ]]
+    if [[ "A${NETWORK_DEVICE-}" == "A" ]] || [[ "A${NETWORK_DEVICE-}" == 'A""' ]]
     then
         macaddr=$(ip addr show $netdevice | grep link | awk '{print $2}' | head -1)
     else
@@ -158,13 +158,14 @@ get_primary_interface () {
     fi
 
     ## Verify networking
-    if [ "A${VERIFIED_NETWORKING}" != "Ayes" ]
+    if [ "A${VERIFIED_NETWORKING-}" != "Ayes" ]
     then
         verify_networking
     fi
 }
 
 function verify_networking () {
+    printf "%s\n\n" ""
     printf "%s\n" "  ${blu}Networking Details${end}"
     printf "%s\n" "  ${blu}***********************************************************${end}"
     printf "%s\n\n" "  The below networking information was discovered and will be used for setting a bridge network."
@@ -192,54 +193,24 @@ function verify_networking () {
             result=$(echo "${selected_option}"| awk '{print $1}')
             case $result in
                 netdevice)
-            	echo "netdevice=$netdevice" >> $tmp_file
-                    echo -n "  Enter the network interface:  "
-                    read user_input
-                    confirm "  You entered ${cyn}$user_input${end}, is this correct? ${cyn}yes/no${end}"
-                    if [ "A${response}" == "Ayes" ]
-                    then
-                        netdevice="$user_input"
-                    fi
+            	    echo "netdevice=$netdevice" >> $tmp_file
+                    confirm_correct "Enter the network interface" netdevice
                     ;;
                 ipaddress)
-            	echo "ipaddress=$ipaddress" >> $tmp_file
-                    echo -n "  Enter ip address to assign to ${netdevice}:  "
-                    read user_input
-                    confirm "  You entered ${cyn}$user_input${end}, is this correct? ${cyn}yes/no${end}"
-                    if [ "A${response}" == "Ayes" ]
-                    then
-                        ipaddress="$user_input"
-                    fi
+            	    echo "ipaddress=$ipaddress" >> $tmp_file
+                    confirm_correct "Enter ip address to assign to ${netdevice}" ipaddress
                     ;;
                 gateway)
-            	echo "gateway=$gateway" >> $tmp_file
-                    echo -n "  Enter gateway address to assign to ${netdevice}:  "
-                    read user_input
-                    confirm "  You entered ${cyn}$user_input${end}, is this correct? ${cyn}yes/no${end}"
-                    if [ "A${response}" == "Ayes" ]
-                    then
-                        gateway="$user_input"
-                    fi
+            	    echo "gateway=$gateway" >> $tmp_file
+                    confirm_correct "Enter gateway address to assign to ${netdevice}" gateway
                     ;;
                 network)
-            	echo "network=$network" >> $tmp_file
-                    echo -n "  Enter the netmask cidr for ip ${ipaddress}:  "
-                    read user_input
-                    confirm "  You entered ${cyn}$user_input${end}, is this correct? ${cyn}yes/no${end}"
-                    if [ "A${response}" == "Ayes" ]
-                    then
-                        network="$user_input"
-                    fi
+            	    echo "network=$network" >> $tmp_file
+                    onfirm_correct "Enter the netmask cidr for ip ${ipaddress}" network
                     ;;
                 macaddr)
-            	echo "macaddr=$macaddr" >> $tmp_file
-                    echo -n "  Enter the mac address assocaited with ${netdevice}:  "
-                    read user_input
-                    confirm "  You entered ${cyn}$user_input${end}, is this correct? ${cyn}yes/no${end}"
-                    if [ "A${response}" == "Ayes" ]
-                    then
-                        macaddr="$user_input"
-                    fi
+            	    echo "macaddr=$macaddr" >> $tmp_file
+                    confirm_correct "Enter the mac address assocaited with ${netdevice}" macaddr
                     ;;
                 Reset)
             	source $tmp_file
@@ -264,7 +235,6 @@ function verify_networking () {
 ## Check for RHSM registration
 ##---------------------------------------------------------------------
 function pre_os_check () {
-    RHSM_SYSTEM=no
     rhel_release=$(cat /etc/redhat-release | grep -o [7-8].[0-9])
     rhel_major=$(sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release)
     os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
@@ -278,13 +248,14 @@ function pre_os_check () {
             printf "%s\n" " ${red}The subscription-manager command is required.${end}"
 	    exit 1
 	fi
+    else
+        RHSM_SYSTEM=no
     fi
 }
 
 	    
 function check_rhsm_status () {
-    SYSTEM_REGISTERED=no
-    if [ "A${RHSM_SYSTEM}" == 'Ayes' ]
+    if [ "A${RHSM_SYSTEM-}" == 'Ayes' ]
     then
         printf "%s\n" ""
         printf "%s\n" "  ${blu}Confirming System Registration Status${end}"
@@ -299,18 +270,20 @@ function check_rhsm_status () {
 }
 
 function verify_rhsm_status () {
+   
+   ## Ensure the system is registered
    sudo subscription-manager identity > /dev/null 2>&1
-   RESULT="$?"
-   if [ "A${RESULT}" == "A1" ]
+   sub_identity_status="$?"
+   if [ "A${sub_identity_status}" == "A1" ]
    then
-       printf "%s\n" " ${red}This system is not yet registered to Red Hat.${end}"
-       printf "%s\n\n" " Please run: ${grn}qubinode-installer -m rhsm${end}"
-       exit 1
+       ## Register system to Red Hat
+       register_system
    fi
 
+   ## Ensure the system status is current
    status_result=$(mktemp)
    sudo subscription-manager status > "${status_result}" 2>&1
-   status=$(awk -F: '/Overall Status:/ {print $2}' "${status_result}"|sed 's/^ *//g')
+   sub_status=$(awk -F: '/Overall Status:/ {print $2}' "${status_result}"|sed 's/^ *//g')
    if [ "A${status}" != "ACurrent" ]
    then
        sudo subscription-manager refresh > /dev/null 2>&1
@@ -322,8 +295,8 @@ function verify_rhsm_status () {
    status=$(awk -F: '/Overall Status:/ {print $2}' "${status_result}"|sed 's/^ *//g')
    if [ "A${status}" != "ACurrent" ]
    then
-       printf "%s\n" " Cannot determine the subscription status of ${yel}$(hostname)${end}"
-       printf "%s\n" " Error details are: "
+       printf "%s\n" " ${red}Cannot determine the subscription status of ${end}${cyn}$(hostname)${end}"
+       printf "%s\n" " ${red}Error details are:${end} "
        cat "${status_result}"
        printf "%s\n\n" " Please resolved and try again"
        exit 1
@@ -336,12 +309,13 @@ function register_system () {
 
     if [ "A${RHSM_SYSTEM}" == "Ayes" -a "A${SYSTEM_REGISTERED}" == "Ano" ]
     then
+        printf "%s\n\n" ""
         printf "%s\n" "  ${blu}***********************************************************${end}"
         printf "%s\n" "  ${blu}RHSM Registration${end}"
         rhsm_reg_result=$(mktemp)
         echo sudo subscription-manager register \
     	      "${RHSM_CMD_OPTS}" --force \
-    	      --release="'${RHEL_RELEASE}'"|\
+    	      --release="'${RHEL_RELEASE-}'"|\
     	      sh > "${rhsm_reg_result}" 2>&1
         RESULT="$?"
         if [ ${RESULT} -eq 0 ]
@@ -361,24 +335,64 @@ function register_system () {
 ## Get User Input
 ##---------------------------------------------------------------------
 
-## Confirm user selection
+## confirm with user if they want to continue
 function confirm () {
     continue=""
     while [[ "${continue}" != "yes" ]];
     do
-        read -r -p "${1:-Are you sure Yes or no?} " response
-        if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]
+        read -r -p "${1:-are you sure yes or no?} " response
+        if [[ $response =~ ^([yy][ee][ss]|[yy])$ ]]
         then
             response="yes"
             continue="yes"
-        elif [[ $response =~ ^([nN][oO])$ ]]
+        elif [[ $response =~ ^([nn][oo])$ ]]
         then
-            #echo "You choose $response"
+            #echo "you choose $response"
             response="no"
             continue="yes"
         else
-            printf "%s\n" " ${blu}Try again!${end}"
+            printf "%s\n" " ${blu}try again!${end}"
         fi
+    done
+}
+
+## accept input from user and return the input
+function accept_user_input ()
+{
+    local __questionvar="$1"
+    local __resultvar="$2"
+    echo -n "  ${blu}${__questionvar}${end} and press ${cyn}[ENTER]${end}: "
+    read input_from_user
+    local output_data="$input_from_user"
+
+    if [[ "$__resultvar" ]]; then
+        eval $__resultvar="'$output_data'"
+    else
+        echo "$output_data"
+    fi
+}
+
+## confirm if input is correct
+function confirm_correct () {
+    entry_is_correct=""
+    local __user_question=$1
+    local __resultvar="$2"
+
+    while [[ "${entry_is_correct}" != "yes" ]];
+    do
+	## Get input from user
+        accept_user_input "$__user_question" user_input_data
+        if [[ "$__resultvar" ]]; then
+            eval $__resultvar="'$user_input_data'"
+        else
+            echo "$user_input_data"
+        fi
+
+	read -r -p "  You entered ${cyn}$user_input_data${end}, is this correct? ${cyn}yes/no${end} " response
+        if [[ $response =~ ^([yy][ee][ss]|[yy])$ ]]
+        then
+            entry_is_correct="yes"
+	fi
     done
 }
 
@@ -451,6 +465,7 @@ function check_vault_values () {
 }
 
 function rhsm_get_reg_method () {
+    printf "%s\n\n" ""
     printf "%s\n" "  ${blu}***********************************************************${end}"
     printf "%s\n\n" "  ${blu}Red Hat Subscription Registration${end}"
 
@@ -483,22 +498,15 @@ function accept_sensitive_input () {
 
         
 function rhsm_credentials_prompt () {
-    if [ "A${RHSM_REG_METHOD}" == "AUsername" ]
+    if [ "A${RHSM_REG_METHOD-}" == "AUsername" ]
     then
-        if [[ "A${RHSM_USERNAME}" == 'A""' ]] || [[ "A${RHSM_USERNAME}" == 'A' ]]
+        if [[ "A${RHSM_USERNAME-}" == 'A""' ]] || [[ "A${RHSM_USERNAME-}" == 'A' ]]
         then
             printf "%s\n" ""
-            echo -n "  Enter your RHSM username and press ${cyn}[ENTER]${end}: "
-            read rhsm_username
-            confirm "  You entered ${cyn}$rhsm_username${end}, is this correct? ${cyn}yes/no${end}"
-            if [ "A${response}" == "Ayes" ]
-            then
-                RHSM_USERNAME="$rhsm_username"
-            fi
-	    
+	    confirm_correct "Enter your RHSM username and press" RHSM_USERNAME
         fi
 
-        if [[ "A${RHSM_PASSWORD}" == 'A""' ]] || [[ "A${RHSM_PASSWORD}" == 'A' ]]
+        if [[ "A${RHSM_PASSWORD-}" == 'A""' ]] || [[ "A${RHSM_PASSWORD-}" == 'A' ]]
         then
 	    MSG_ONE="Enter your RHSM password and press ${cyn}[ENTER]${end}:"
             MSG_TWO="Enter your RHSM password password again ${cyn}[ENTER]${end}:"
@@ -512,7 +520,7 @@ function rhsm_credentials_prompt () {
 
     if [ "A${RHSM_REG_METHOD}" == "AActivation" ]
     then
-        if [[ "A${RHSM_ORG}" == 'A""' ]] || [[ "A${RHSM_ORG}" == 'A' ]]
+        if [[ "A${RHSM_ORG-}" == 'A""' ]] || [[ "A${RHSM_ORG-}" == 'A' ]]
         then
             printf "%s\n\n" ""
 	    MSG_ONE="Enter your RHSM org id and press ${cyn}[ENTER]${end}:"
@@ -521,24 +529,18 @@ function rhsm_credentials_prompt () {
             RHSM_ORG="${USER_INPUT2}"
         fi
 
-        if [[ "A${RHSM_ACTKEY}" == 'A""' ]] || [[ "A${RHSM_ACTKEY}" == 'A' ]]
+        if [[ "A${RHSM_ACTKEY-}" == 'A""' ]] || [[ "A${RHSM_ACTKEY-}" == 'A' ]]
         then
-            echo -n "  ${blu}Enter your RHSM activation key and press${end} ${cyn}[ENTER]${end}: "
-            read rhsm_actkey
-            confirm "  You entered ${cyn}$rhsm_actkey${end}, is this correct? ${cyn}yes/no${end}"
-            if [ "A${response}" == "Ayes" ]
-            then
-                RHSM_ACTKEY="$rhsm_actkey"
-            fi
+	    confirm_correct "Enter your RHSM activation key" RHSM_ACTKEY
         fi
 
 	## Set registration argument
-	RHSM_CMD_OPTS="--org=${RHSM_ORG} --activationkey=${RHSM_ACTKEY}"
+	RHSM_CMD_OPTS="--org=${RHSM_ORG-} --activationkey=${RHSM_ACTKEY}"
     fi
 }
 
 function ask_user_for_rhsm_credentials () {
-    if [[ "A${RHSM_REG_METHOD}" == "A" ]] || [[ "A${RHSM_REG_METHOD}" == 'A""' ]]
+    if [[ "A${RHSM_REG_METHOD-}" == "A" ]] || [[ "A${RHSM_REG_METHOD-}" == 'A""' ]]
     then
 	rhsm_get_reg_method
         rhsm_credentials_prompt
@@ -549,16 +551,16 @@ function ask_user_for_rhsm_credentials () {
 
 function ask_for_admin_user_pass () {
     # root user password to be set for virtual instances created
-    if [[ "A${ADMIN_USER_PASS}" == 'A""' ]] || [[ "A${ADMIN_USER_PASS}" == 'A' ]]
+    if [[ "A${ADMIN_USER_PASS-}" == 'A""' ]] || [[ "A${ADMIN_USER_PASS-}" == 'A' ]]
     then
         printf "%s\n\n" ""
         printf "%s\n" "  When entering passwords, do not ${cyn}Backspace${end}."
         printf "%s\n" "  Use ${cyn}Ctrl-c${end} to cancel then run the installer again."
 	printf "%s\n" "  ${blu}***********************************************************${end}"
-        printf "%s\n" "  Your username ${cyn}${CURRENT_USER}${end} will be used to ssh into all the VMs created."
+        printf "%s\n" "  Your username ${cyn}${ADMIN_USER}${end} will be used to ssh into all the VMs created."
 
-        MSG_ONE="Enter a password for ${cyn}${CURRENT_USER}${end} ${blu}[ENTER]${end}:"
-        MSG_TWO="Enter a password again for ${cyn}${CURRENT_USER}${end} ${blu}[ENTER]${end}:"
+        MSG_ONE="Enter a password for ${cyn}${ADMIN_USER}${end} ${blu}[ENTER]${end}:"
+        MSG_TWO="Enter a password again for ${cyn}${ADMIN_USER}${end} ${blu}[ENTER]${end}:"
         accept_sensitive_input
         ADMIN_USER_PASS="$USER_INPUT2"
     fi
@@ -566,33 +568,40 @@ function ask_for_admin_user_pass () {
 
 function check_additional_storage () {
     getPrimaryDisk
-    if [[ "A${CREATE_LIBVIRT_LVM}" != "Ano" ]]
+    create_libvirt_lvm="${CREATE_LIBVIRT_LVM:-yes}"
+    libvirt_pool_disk="${LIBVIRT_POOL_DISK:-none}"
+    libvirt_dir_verify="${LIBVIRT_DIR_VERIFY:-yes}"
+    libvirt_dir="${LIBVIRT_DIR:-/var/lib/libvirt/images}"
+    LIBVIRT_DIR="${LIBVIRT_DIR:-$libvirt_dir}"
+
+    # confirm directory for libvirt images
+    if [ "A${libvirt_dir_verify}" == "Ayes" ]
     then
-        if [[ "A${LIBVIRT_POOL_DISK}" == "A" ]] || [[ "A${LIBVIRT_POOL_DISK}" == 'A""' ]]
+        printf "%s\n\n" ""
+        printf "%s\n" "  ${blu}***********************************************************${end}"
+        printf "%s\n\n" "  ${blu}Location for Libvirt directory Pool${end}"
+        printf "%s\n" "   The current path is set to ${cyn}$libvirt_dir${end}."
+        printf "%s\n" ""
+        confirm "   Do you want to change it? ${blu}yes/no${end}"
+        if [ "A${response}" == "Ayes" ]
         then
-            CHECK_STORAGE=yes
-            CREATE_LIBVIRT_LVM=yes
-        else
-            LIBVIRT_POOL_DISK="$LIBVIRT_POOL_DISK"
-            CHECK_STORAGE=no
-        fi
-    else
-        ## default behaviour is to dedicate a disk to libvirt directory pool
-        CREATE_LIBVIRT_LVM="$CREATE_LIBVIRT_LVM"
+	    confirm_correct "Enter a new path" LIBVIRT_DIR
+	fi
     fi
 
-    if [ "A${CHECK_STORAGE}" == "Ayes" ]
+    if [[ "A${create_libvirt_lvm}" == "Ayes" ]] && [[ "A${libvirt_pool_disk}" == "Anone" ]]
     then
+        printf "%s\n\n" ""
         printf "%s\n" "  ${blu}***********************************************************${end}"
-        printf "%s\n\n" "    ${cyn}Storage Setup${end}"
-        printf "%s\n" "   It is recommended to dedicate a disk to $LIBVIRT_DIR."
+        printf "%s\n\n" "    ${blu}Dedicated Storage Device For Libvirt Directory Pool${end}"
+        printf "%s\n" "   It is recommended to dedicate a disk to ${cyn}$LIBVIRT_DIR${end}."
         printf "%s\n" "   Qubinode uses libvirt directory pool for VM disk storage"
         printf "%s\n" ""
 
         declare -a AVAILABLE_DISKS=($ALL_DISK)
         if [ ${#AVAILABLE_DISKS[@]} -gt 1 ]
         then
-            printf "%s\n" "   Your primary storage device appears to be ${blu}${PRIMARY_DISK}${end}."
+            printf "%s\n" "   Your primary storage device appears to be ${blu}${primary_disk}${end}."
             printf "%s\n\n" "   The following additional storage devices where found:"
 
             for disk in $(echo ${AVAILABLE_DISKS[@]})
@@ -609,10 +618,17 @@ function check_additional_storage () {
             printf "%s\n" "   Please select secondary disk to be used."
             createmenu "${AVAILABLE_DISKS[@]}"
             libvirt_pool_disk=$(echo "${selected_option}"|awk '{print $1}')
+            confirm "   Continue with disk ${cyn}$libvirt_pool_disk${end}: ${blu}yes/no${end}"
+            if [ "A${response}" != "Ayes" ]
+            then
+                printf "%s\n" "   Please run the installer again to make a different selection."
+		exit 1
+	    fi
+            
             LIBVIRT_POOL_DISK="$libvirt_pool_disk"
             CREATE_LIBVIRT_LVM=yes
 	else
-            LIBVIRT_POOL_DISK=""
+            LIBVIRT_POOL_DISK="none"
             CREATE_LIBVIRT_LVM=no
         fi
     fi
@@ -627,8 +643,8 @@ function ask_idm_password () {
         printf "%s\n" "  Use ${blu}Ctrl-c${end} to cancel then run the installer again."
         unset IDM_USER_PASS
         printf "%s\n" "  ${blu}**************************************************${end}"
-        MSG_ONE="Enter a password for the IdM server ${blu}${IDM_SERVER_HOSTNAME}.${DOMAIN}${end} ${cyn}[ENTER]${end}:"
-        MSG_TWO="Enter a password again for the IdM server ${blu}${IDM_SERVER_HOSTNAME}.${DOMAIN}${end} ${cyn}[ENTER]${end}:"
+        MSG_ONE="Enter a password for the IdM server ${blu}${IDM_SERVER_HOSTNAME-}.${DOMAIN-}${end} ${cyn}[ENTER]${end}:"
+        MSG_TWO="Enter a password again for the IdM server ${blu}${IDM_SERVER_HOSTNAME-}.${DOMAIN-}${end} ${cyn}[ENTER]${end}:"
         accept_sensitive_input
         IDM_USER_PASS="${USER_INPUT2}"
     fi
@@ -636,39 +652,63 @@ function ask_idm_password () {
 
 function set_idm_static_ip () {
     printf "%s\n" ""
-    read -p " $static_ip_msg: " USER_IDM_SERVER_IP
-    idm_server_ip="${USER_IDM_SERVER_IP}"
-    confirm "  You entered ${cyn}$idm_server_ip${end}, is this correct? ${cyn}yes/no${end}"
-    if [ "A${response}" == "Ayes" ]
+    confirm_correct "$static_ip_msg" IDM_SERVER_IP
+    if [ "A${IDM_SERVER_IP}" != "A" ]
     then
-        IDM_SERVER_IP="${idm_server_ip}"
-	USE_IDM_STATIC_IP=yes
-        printf "%s\n\n" " $static_ip_result_msg ${cyn}$idm_server_ip${end}"
+        printf "%s\n" "  The qubinode-installer will connect to the IdM server on ${cyn}$IDM_SERVER_IP${end}"
     fi
 }
 
-function ask_about_domain() {
-    if [[ "A${DOMAIN}" == "A" ]] || [[ "A${DOMAIN}" == 'A""' ]]
+function confirm_user_domain () {
+    if [ "A${confirmation_question}" != "Anull" ]
     then
-        printf "%s\n" "   The domain ${blu}${GENERATED_DOMAIN}${end} was generated for you."
-        confirm "   Do you want to change it? ${blu}yes/no${end}"
+        echo -n "   ${confirmation_question}: "
+        read USER_DOMAIN
+        confirm_correct "  You entered ${cyn}$USER_DOMAIN${end}, is this correct? ${cyn}yes/no${end}"
         if [ "A${response}" == "Ayes" ]
         then
-            echo -n "   Enter your domain name: "
-            read USER_DOMAIN
             DOMAIN="$USER_DOMAIN"
-        else
-            DOMAIN="${GENERATED_DOMAIN}"
         fi
     fi
 }
 
+function ask_about_domain() {
+    domain_tld="${DOMAIN_TLD:-lan}"
+    generated_domain="${ADMIN_USER}.${domain_tld}"
+    printf "%s\n\n" ""
+    printf "%s\n" "  ${blu}***********************************************************${end}"
+    printf "%s\n\n" "  ${blu}DNS Domain${end}"
+
+    if [[ "A${USE_EXISTING_IDM-}" == "Ayes" ]]
+    then
+	confirmation_question="Enter your existing IdM server domain, e.g. example.com"
+    else
+        printf "%s\n" "   The domain ${cyn}${GENERATED_DOMAIN:-$generated_domain}${end} was generated for you."
+        confirm "   Do you want to change it? ${blu}yes/no${end}"
+        if [ "A${response}" == "Ayes" ]
+        then
+	    confirmation_question="Enter your domain name"
+        else
+            DOMAIN="${generated_domain}"
+	    confirmation_question=null
+        fi
+    fi
+
+    ## run function asking user to enter domain
+    confirm_user_domain
+}
+
 
 function ask_about_idm() {
+
+    ## Default variables
+    idm_server_ip="${IDM_SERVER_IP:-none}"
+    allow_zone_overlap="${ALLOW_ZONE_OVERLAP:-none}"
+
     ## Should IdM be deployed
-    if [[ "A${DEPLOY_IDM}" == "Ayes" ]] || [[ "A${DEPLOY_IDM}" != 'Ano' ]]
+    if [[ "A${DEPLOY_IDM-}" == "Ayes" ]] || [[ "A${DEPLOY_IDM-}" != 'Ano' ]]
     then
-	case "${IDM_DEPLOY_METHOD}" in new|existing|no)
+	case "${IDM_DEPLOY_METHOD-}" in deploy|existing|no)
             DEPLOY_IDM="no"
 	    ;;
 	*)
@@ -677,7 +717,7 @@ function ask_about_idm() {
             printf "%s\n" "  An IdM server can be deployed if LDAP is needed."
             printf "%s\n" "  The installer can deploy or connect to an existing IdM server."
             printf "%s\n" "  What would you like to do?"
-            idm_choices=('new' 'existing' 'no deployment')
+            idm_choices=('deploy' 'existing' 'no deployment')
             createmenu "${idm_choices[@]}"
             idm_choice=$(echo "${selected_option}"|awk '{print $1}')
             confirm "  Continue with ${blu}$idm_choice${end} deployment of IdM server? ${blu}yes/no${end}"
@@ -699,38 +739,34 @@ function ask_about_idm() {
 	esac
     fi
 
-    ## Verify domain with user
-    ask_about_domain
-
     ## Options for IDM server deployment
-    if [[ "A${USE_EXISTING_IDM}" == "Ayes" ]]
+    if [[ "A${USE_EXISTING_IDM-}" == "Ayes" ]]
     then
-	if [ "A${IDM_EXISTING_HOSTNAME}" == "A" -a "A${IDM_EXISTING_HOSTNAME}" == 'A""' ]
+	if [ "A${IDM_EXISTING_HOSTNAME-}" == "A" -a "A${IDM_EXISTING_HOSTNAME-}" == 'A""' ]
 	then
             printf "%s\n" "  Please provide the hostname of the existing IdM server."
-            printf "%s\n\n" "  For example if you IdM server is ${blu}dns01.lab.com${end}, you should enter ${blu}dns01${end}."
+            printf "%s\n\n" "  For example if you IdM server is ${cyn}dns01.lab.com${end}, you should enter ${blu}dns01${end}."
             read -p "  ${blu}Enter the existing DNS server hostname?${end} " IDM_NAME
             idm_hostname="${IDM_NAME}"
-            confirm "  You entered ${cyn}$idm_hostname${end}, is this correct? ${cyn}yes/no${end}"
+            confirm_correct "  You entered ${cyn}$idm_hostname${end}, is this correct? ${cyn}yes/no${end}"
             if [ "A${response}" == "Ayes" ]
             then
                 IDM_EXISTING_HOSTNAME="$idm_hostname"
             fi
 	fi
 
-	if [ "A${IDM_SERVER_IP}" == "A" -a "A${IDM_SERVER_IP}" == 'A""' ]
+	if [ "A${idm_server_ip}" == "Anull" ]
 	then
     	    ## Get the Idm server ip
 	    static_ip_msg=" Enter the ip address for the existing IdM server"
-            static_ip_result_msg=" The qubinode-installer will connect to the IdM server on"
     	    set_idm_static_ip
 	fi
 
-	if [ "A${IDM_EXISTING_ADMIN_USER}" == "A" -a "A${IDM_EXISTING_ADMIN_USER}" == 'A""' ]
+	if [ "A${IDM_EXISTING_ADMIN_USER-}" == "A" -a "A${IDM_EXISTING_ADMIN_USER-}" == 'A""' ]
 	then
             read -p "  What is the your existing IdM server admin username? " IDM_USER
             idm_admin_user=$IDM_USER
-            confirm "  You entered $idm_admin_user, is this correct? ${blu}yes/no${end}"
+            confirm_correct "  You entered $idm_admin_user, is this correct? ${cyn}yes/no${end}"
             if [ "A${response}" == "Ayes" ]
             then
     	    IDM_EXISTING_ADMIN_USER="$idm_admin_user"
@@ -742,10 +778,10 @@ function ask_about_idm() {
     fi
 
     ### Deploy new IdM server
-    if [[ "A${IDM_DEPLOY_METHOD}" == "Anew" ]]
+    if [[ "A${IDM_DEPLOY_METHOD}" == "Adeploy" ]]
     then
 	USE_EXISTING_IDM=no
-	if [ "A${IDM_SERVER_IP}" == "A" -a "A${IDM_SERVER_IP}" == 'A""' ]
+	if [ "A${idm_server_ip}" == "Anone" ]
 	then
             printf "%s\n" ""
             printf "%s\n" "  The IdM server will be assigned a dynamic ip address from"
@@ -754,15 +790,13 @@ function ask_about_idm() {
             if [ "A${response}" == "Ayes" ]
             then
                 static_ip_msg=" Enter the ip address you would like to assign to the IdM server"
-                static_ip_result_msg=" The qubinode-installer will connect to the IdM server on"
                 set_idm_static_ip
             fi
 	fi
     fi
 
     ## allow-zone-overlap
-    ALLOW_ZONE_OVERLAP=no
-    if [ "A${ALLOW_ZONE_OVERLAP}" == "A" -a "A${ALLOW_ZONE_OVERLAP}" == 'A""' ]
+    if [ "A${idm_server_ip}" == "Anone" ]
     then
         printf "%s\n" "  You can safely choose no for this next question."
         printf "%s\n" "  Choose yes if you using an existing domain name."
@@ -770,16 +804,37 @@ function ask_about_idm() {
         if [ "A${response}" == "Ayes" ]
         then
              ALLOW_ZONE_OVERLAP=yes
+	else
+             ALLOW_ZONE_OVERLAP=no
         fi
     fi
+
+    # shellcheck disable=SC2034 # used when qubinode_vars.yml generated
+    #name_prefix="${NAME_PREFIX:-qbn}"
+    #idm_hostname_prefix="${IDM_HOSTNAME_PREFIX:-idm01}"
+    #GENERATED_IDM_HOSTNAME="${name_prefix}-${idm_hostname_prefix}"
+    #_IDM_SERVER_HOSTNAME="${IDM_EXISTING_HOSTNAME:-$GENERATED_IDM_HOSTNAME}"
+
+    ## shellcheck disable=SC2034 # used when qubinode_vars.yml generated
+    #_IDM_ADMIN_USER="${IDM_EXISTING_ADMIN_USER:-$ADMIN_USER}"
 }
 
 ##---------------------------------------------------------------------
-## KVM HOST SETUP
+## YUM, PIP packages and Ansible roles, collections
 ##---------------------------------------------------------------------
 function install_packages () {
+
+    ## default vars
+    _rhel7_packages="python python3-pip python2-pip python-dns"
+    _rhel8_repos="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
+    _yum_packages="python3-pyyaml python3 python3-pip python3-dns ansible git podman python-podman-api toolbox"
+    rhel8_repos="${RHEL8_REPOS:-$_rhel8_repos}"
+    pip_packages="${PIP_PACKAGES:-yml2json}"
+    rhel7_packages="${RHEL7_PACKAGES:-$_rhel7_packages}"
+    yum_packages="${YUM_PACKAGES:-$_yum_packages}"
+
     # install python
-    if [ "A${PYTHON3_INSTALLED}" == "Ano" -o "A${ANSIBLE_INSTALLED}" == "Ano" ]
+    if [ "A${PYTHON3_INSTALLED-}" == "Ano" -o "A${ANSIBLE_INSTALLED-}" == "Ano" ]
     then
         printf "%s\n" "  ${blu}***********************************************************${end}"
         printf "%s\n\n" "  ${blu}Install Packages${end}"
@@ -808,9 +863,9 @@ function install_packages () {
 	fi
 
 	 ## Install on RHEL8 and fedora
-	 if [[ "A${OS_NAME}" == "AFedora" ]] || [[ "$RHEL_MAJOR" == "8" ]]
+	 if [[ "A${OS_NAME-}" == "AFedora" ]] || [[ "$RHEL_MAJOR" == "8" ]]
          then
-             printf "%s\n" "   ${yel}Installing required python rpms..${end}"
+             printf "%s\n" "   ${blu}Installing required python rpms..${end}"
              sudo yum clean all > /dev/null 2>&1
              sudo rm -r /var/cache/dnf
              sudo yum install -y -q -e 0 "$yum_packages"> /dev/null 2>&1
@@ -836,4 +891,11 @@ function install_packages () {
 	    fi
         done
     fi
+}
+
+##---------------------------------------------------------------------
+##  MENU OPTIONS
+##---------------------------------------------------------------------
+function display_help() {
+    cat < "${project_dir}/docs/qubinode/qubinode-menu-options.adoc"
 }

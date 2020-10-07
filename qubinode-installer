@@ -1,56 +1,63 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# shellcheck disable=SC2034 # Define colours
+## Enable xtrace if the DEBUG environment variable is set
+if [[ ${DEBUG-} =~ ^1|yes|true$ ]]; then
+    set -o xtrace       # Trace the execution of the script (debug)
+fi
+
+set -o errexit          # Exit on most errors (see the manual)
+set -o errtrace         # Make sure any error trap is inherited
+set -o nounset          # Disallow expansion of unset variables
+#set -o pipefail         # Use last non-zero exit code in a pipeline
+
+## setup colours used
+# shellcheck disable=SC2034 # use to indicate errors
 red=$'\e[1;31m'
+# shellcheck disable=SC2034 # unsed
 grn=$'\e[1;32m'
+# shellcheck disable=SC2034 # used to indicate success
 yel=$'\e[1;33m'
+# shellcheck disable=SC2034 # used to indicate heading
 blu=$'\e[1;34m'
+# shellcheck disable=SC2034 # unsed
 mag=$'\e[1;35m'
+# shellcheck disable=SC2034 # use to highlight words
 cyn=$'\e[1;36m'
+# shellcheck disable=SC2034 # unsed
 def=$'\e[1;49m'
+# shellcheck disable=SC2034 # used to close one of the colors
 end=$'\e[0m'
+
+## Find the source path for the qubinode-installer script
+project_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+if [ ! -d "${project_dir}/playbooks/vars" ] ; then
+    printf "%s\n" "  ${red}There was an error finding the full path to the qubinode-installer project directory${end}"
+fi
+
 
 ## check for lib/global_functions.sh and source it
 ## or exit if it's now found
-GLOBAL_FUNCTIONS="lib/qubinode_functions.sh"
+GLOBAL_FUNCTIONS="${project_dir}/lib/qubinode_functions.sh"
 if [ -f "$GLOBAL_FUNCTIONS" ]
 then
     # shellcheck disable=SC1091
     # shellcheck source=lib/global_functions.sh
     source "$GLOBAL_FUNCTIONS"
-    setup_required_paths
 else
     echo "Could not find $GLOBAL_FUNCTIONS. Make sure you are in the qubinode-installer directory"
 fi
 
-## This file consist of functions that are used throughout th code base
-
+# GLOBAL Variables
 VAULT_FILE="${project_dir:?}/playbooks/vars/vault.yml"
+VAULT_SAMPLE_FILE="${project_dir:?}/samples/qubinode_vault.yml"
 QUBINODE_BASH_VARS="${project_dir:?}/qubinode_vars.txt"
 QUBINODE_ANSIBLE_VARS="${project_dir:?}/playbooks/vars/qubinode_vars.yml"
 QUBINODE_ANSIBLE_JSON="${project_dir:?}/playbooks/vars/qubinode_vars.json"
 QUBINODE_BASH_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.txt"
 QUBINODE_ANSIBLE_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.yml"
 CURRENT_USER=$(whoami)
+# shellcheck disable=SC2034  # called when vault file is generated
 RANDOM_GENERATED_PASS=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 8)
-NAME_PREFIX="qbn"
-GENERATED_DOMAIN="${CURRENT_USER}.lan"
-GENERATED_IDM_HOSTNAME="${NAME_PREFIX}-idm01"
-
-if [[ "A${LIBVIRT_DIR}" == "A" ]] || [[ "A${LIBVIRT_DIR}" == 'A""' ]]
-then
-    LIBVIRT_DIR=/var/lib/libvirt/images
-else
-    LIBVIRT_DIR="${LIBVIRT_DIR}"
-fi
-
-
-if [[ "A${ADMIN_USER}" == "A" ]] || [[ "A${ADMIN_USER}" == 'A""' ]]
-then
-    ADMIN_USER="$CURRENT_USER"
-else
-    ADMIN_USER="${ADMIN_USER}"
-fi
 
 ## Load existing vars
 if [ -f "$QUBINODE_BASH_VARS" ]
@@ -62,115 +69,135 @@ then
     set +o allexport
 fi
 
-## OS Check
-pre_os_check
+## sets up required options
+function qubinode_firstrun () {
+    ## This file consist of functions that are used throughout th code base
+    ## declare defaults for required vars
+    ADMIN_USER="${ADMIN_USER:-$CURRENT_USER}"
+    ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-no}"
+    PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-no}"
+    domain_tld="${DOMAIN_TLD:-lan}"
+    generated_domain="${ADMIN_USER}.${domain_tld}"
+    name_prefix="${NAME_PREFIX:-qbn}"
+    idm_hostname_prefix="${IDM_HOSTNAME_PREFIX:-idm01}"
+    GENERATED_IDM_HOSTNAME="${name_prefix}-${idm_hostname_prefix}"
 
-## Get host primary disk
-getPrimaryDisk
+    ## check if ansible is installed
+    if which ansible > /dev/null 2>&1
+    then
+      ANSIBLE_INSTALLED=yes
+    fi
+    
+    ## check if python3 is installed
+    if which python3> /dev/null 2>&1
+    then
+      PYTHON3_INSTALLED=yes
+    fi
+}
 
-## check if ansible is installed
-if which ansible > /dev/null 2>&1
-then
-  ANSIBLE_INSTALLED=yes
-else
-  ANSIBLE_INSTALLED=no
-fi
+## this function ensure the system is ready for ansible and python
+## in addition it collects all the required information required
+function qubinode_baseline () {
+    ## OS Check
+    pre_os_check
 
-## check if python3 is installed
-if which python3> /dev/null 2>&1
-then
-  PYTHON3_INSTALLED=yes
-else
-  PYTHON3_INSTALLED=no
-fi
+    ## Check system registration status
+    check_rhsm_status
+    ask_user_for_rhsm_credentials
 
-## Get main network interface details
-get_primary_interface
+    ## Confirm storage setup
+    #getPrimaryDisk
+    check_additional_storage
+    
+    ## Get main network interface details
+    get_primary_interface
+    
+    ## These functions will prompt the user
+    ## check sudoers status
+    HAS_SUDO=$(has_sudo)
+    if [ "A${HAS_SUDO}" != "Ahas_sudo__pass_set" ]
+    then
+        # shellcheck disable=SC2034 # used by function setup_sudoers
+        SUDOERS_SETUP=no
+        printf "%s\n\n\n" ""
+        setup_sudoers
+    fi
+    
+    check_vault_values
+#    ask_for_admin_user_pass
+#    ask_about_domain
+#    ask_about_idm
+#    register_system
+#    install_packages
+    
+}
 
-## These functions will prompt the user
-## check sudoers status
-HAS_SUDO=$(has_sudo)
-if [ "A${HAS_SUDO}" != "Ahas_sudo__pass_set" ]
-then
-    SUDOERS_SETUP=no
-    printf "%s\n\n\n" ""
-    setup_sudoers
-fi
+## this function generates the required vars file
+function qubinode_vars () {
+    ## Generate bash variables file
+    TMP_BASH_VARS_FILE=$(mktemp)
+    CURRENT_BASH_VARS_FILE=$(mktemp)
+    
+    ## make a copy of the current bash vars file
+    if [ -f "$QUBINODE_BASH_VARS" ]
+    then
+        cp "$QUBINODE_BASH_VARS" "$CURRENT_BASH_VARS_FILE"
+        rm -f "$QUBINODE_BASH_VARS"
+    fi
+    
+    ## Generate an updated bash vars file
+    ( echo "cat <<EOF>$QUBINODE_BASH_VARS";
+    cat "$QUBINODE_BASH_VARS_TEMPLATE";
+    printf "\nEOF";
+    ) >"$TMP_BASH_VARS_FILE"
 
-check_vault_values
-check_rhsm_status
-ask_for_admin_user_pass
-ask_user_for_rhsm_credentials
-check_additional_storage
-ask_about_idm
-register_system
-install_packages
+    # shellcheck source=/dev/null
+    . "$TMP_BASH_VARS_FILE"
+    
+    ## Generate ansible vars yaml template
+    ANSIBLE_TEMPLATE=$(mktemp)
+    TMP_ANSIBLE_FILE=$(mktemp)
+    
+    test -f "$QUBINODE_ANSIBLE_VARS" && rm -f "$QUBINODE_ANSIBLE_VARS"
+    cp "$QUBINODE_ANSIBLE_VARS_TEMPLATE" "$ANSIBLE_TEMPLATE"
+    cat "$QUBINODE_BASH_VARS" >> "$ANSIBLE_TEMPLATE"
+    sed -i 's/=/: /g' "$ANSIBLE_TEMPLATE"
+    
+    ( echo "cat <<EOF>$QUBINODE_ANSIBLE_VARS";
+    cat "$ANSIBLE_TEMPLATE";
+    printf "\nEOF";
+    ) >"$TMP_ANSIBLE_FILE"
 
-## temp variabes used to contruct the final vars file
-USE_EXISTING_IDM="${USE_EXISTING_IDM}"
-IDM_EXISTING_HOSTNAME="${IDM_EXISTING_HOSTNAME}"
-_IDM_SERVER_HOSTNAME="${IDM_EXISTING_HOSTNAME:-$GENERATED_IDM_HOSTNAME}"
-_IDM_ADMIN_USER="${IDM_EXISTING_ADMIN_USER:-$ADMIN_USER}"
+    # shellcheck source=/dev/null
+    . "$TMP_ANSIBLE_FILE"
+    
+    ## Final clean up
+    sed -i 's#^[[:alpha:]].*:#\L&#g' "$QUBINODE_ANSIBLE_VARS"
+    sed -i 's/"yes"/yes/g' "$QUBINODE_ANSIBLE_VARS"
+    sed -i 's/"no"/no/g' "$QUBINODE_ANSIBLE_VARS"
+    
+    ## Merge any user added entries
+    if ! cmp "$CURRENT_BASH_VARS_FILE" "$QUBINODE_BASH_VARS" >/dev/null 2>&1
+    then
+        MERGED_FILE=$(mktemp)
+        diff -DVERSION1 "$CURRENT_BASH_VARS_FILE" "$QUBINODE_BASH_VARS" > "$MERGED_FILE"
+        grep -v '^#if' "$MERGED_FILE" | grep -v '^#endif' | grep -v '^#else' > "$QUBINODE_BASH_VARS"
+    fi
+   
+    ## Generate JSON for future use
+    yml2json "$QUBINODE_ANSIBLE_VARS" --pretty --output "$QUBINODE_ANSIBLE_JSON"
 
-cat > "${VAULT_FILE:?}" <<EOF
----
-rhsm_username: ${RHSM_USERNAME}
-rhsm_password: ${RHSM_PASSWORD}
-rhsm_org: ${RHSM_ORG}
-rhsm_activationkey: ${RHSM_ACTKEY}
-admin_user_password: ${ADMIN_USER_PASS}
-idm_ssh_user: root
-idm_dm_pwd: ${RANDOM_GENERATED_PASS:?}
-idm_admin_pwd: ${IDM_USER_PASS:-$ADMIN_USER_PASS}
-tower_pg_password: ${RANDOM_GENERATED_PASS:?}
-tower_rabbitmq_password: ${RANDOM_GENERATED_PASS:?}
-EOF
+    ## Generate an updated vault file
+    TMP_VAULT_FILE=$(mktemp)
+    ( echo "cat <<EOF>$VAULT_FILE";
+    cat "$VAULT_SAMPLE_FILE";
+    printf "\nEOF";
+    ) >"$TMP_VAULT_FILE"
 
-## Generate bash variables file
-TMP_BASH_VARS_FILE=$(mktemp)
-CURRENT_BASH_VARS_FILE=$(mktemp)
+    # shellcheck source=/dev/null
+    . "$TMP_VAULT_FILE"
+}
 
-## make a copy of the current bash vars file
-if [ -f "$QUBINODE_BASH_VARS" ]
-then
-    cp "$QUBINODE_BASH_VARS" "$CURRENT_BASH_VARS_FILE"
-    rm -f "$QUBINODE_BASH_VARS"
-fi
-
-## Generate an updated bash vars file
-( echo "cat <<EOF>$QUBINODE_BASH_VARS";
-cat "$QUBINODE_BASH_VARS_TEMPLATE";
-printf "\nEOF";
-) >"$TMP_BASH_VARS_FILE"
-. "$TMP_BASH_VARS_FILE"
-
-## Generate ansible vars yaml template
-ANSIBLE_TEMPLATE=$(mktemp)
-TMP_ANSIBLE_FILE=$(mktemp)
-
-test -f "$QUBINODE_ANSIBLE_VARS" && rm -f "$QUBINODE_ANSIBLE_VARS"
-cp "$QUBINODE_ANSIBLE_VARS_TEMPLATE" "$ANSIBLE_TEMPLATE"
-cat "$QUBINODE_BASH_VARS" >> "$ANSIBLE_TEMPLATE"
-sed -i 's/=/: /g' "$ANSIBLE_TEMPLATE"
-
-( echo "cat <<EOF>$QUBINODE_ANSIBLE_VARS";
-cat "$ANSIBLE_TEMPLATE";
-printf "\nEOF";
-) >"$TMP_ANSIBLE_FILE"
-. "$TMP_ANSIBLE_FILE"
-
-## Final clean up
-sed -i 's#^[[:alpha:]].*:#\L&#g' "$QUBINODE_ANSIBLE_VARS"
-sed -i 's/"yes"/yes/g' "$QUBINODE_ANSIBLE_VARS"
-sed -i 's/"no"/no/g' "$QUBINODE_ANSIBLE_VARS"
-
-## Merge any user added entries
-if ! cmp "$CURRENT_BASH_VARS_FILE" "$QUBINODE_BASH_VARS" >/dev/null 2>&1
-then
-    MERGED_FILE=$(mktemp)
-    diff -DVERSION1 "$CURRENT_BASH_VARS_FILE" "$QUBINODE_BASH_VARS" > "$MERGED_FILE"
-    grep -v '^#if' "$MERGED_FILE" | grep -v '^#endif' | grep -v '^#else' > "$QUBINODE_BASH_VARS"
-fi
-
-## Generate JSON for future use
-yml2json "$QUBINODE_ANSIBLE_VARS" --pretty --output "$QUBINODE_ANSIBLE_JSON"
+qubinode_firstrun
+qubinode_baseline
+qubinode_vars

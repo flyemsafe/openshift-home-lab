@@ -1,5 +1,8 @@
-## not root user
+## none root user
 ADMIN_USER="${CURRENT_USER}"
+
+## all vms will be prefix with this name
+NAME_PREFIX="${NAME_PREFIX:-$name_prefix}"
 
 ##---------------------------------------------------------------------
 ## Variables for bridge network interface / set to override installer
@@ -14,22 +17,25 @@ MACADDR="${macaddr}"
 ##---------------------------------------------------------------------
 ## Varibles for DNS server
 ##---------------------------------------------------------------------
+DOMAIN_TLD="${DOMAIN_TLD:-lan}"
+IDM_HOSTNAME_PREFIX="${IDM_HOSTNAME_PREFIX:-idm01}"
 REVERSE_ZONE="${reverse_zone}"
-DOMAIN="${DOMAIN}"
-DEPLOY_IDM="${DEPLOY_IDM}"
-IDM_SERVER_HOSTNAME="${_IDM_SERVER_HOSTNAME}"
-IDM_ADMIN_USER="${_IDM_ADMIN_USER}"
-ALLOW_ZONE_OVERLAP="${ALLOW_ZONE_OVERLAP}"
-IDM_SERVER_IP="${IDM_SERVER_IP}"
-USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP}"
-IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD}"
+DOMAIN="${DOMAIN:-$generated_domain}"
+DEPLOY_IDM="${DEPLOY_IDM:-yes}"
+IDM_SERVER_HOSTNAME="${IDM_SERVER_HOSTNAME:-$GENERATED_IDM_HOSTNAME}"
+IDM_ADMIN_USER="${IDM_ADMIN_USER:-admin}"
+ALLOW_ZONE_OVERLAP="${ALLOW_ZONE_OVERLAP:-no}"
+IDM_SERVER_IP="${IDM_SERVER_IP-}"
+USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP:-yes}"
+IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD:-no}"
+USE_EXISTING_IDM="${USE_EXISTING_IDM:-no}"
 
 ##---------------------------------------------------------------------
 ## Libvirt variables
 ##---------------------------------------------------------------------
 LIBVIRT_DIR="${LIBVIRT_DIR}"
-LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK}"
-CREATE_LIBVIRT_LVM="${CREATE_LIBVIRT_LVM}"
+LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK-none}"
+CREATE_LIBVIRT_LVM="${CREATE_LIBVIRT_LVM:-yes}"
 
 ##---------------------------------------------------------------------
 ## Varibles for RHSM
@@ -41,7 +47,7 @@ SYSTEM_REGISTERED="${SYSTEM_REGISTERED}"
 RHSM_REG_METHOD="${RHSM_REG_METHOD}"
 
 ##---------------------------------------------------------------------
-## DO NOT CHANGE THESE
+## Only edit below if you know what you are doing
 ##---------------------------------------------------------------------
 ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED}"
 PYTHON3_INSTALLED="${PYTHON3_INSTALLED}"
@@ -51,7 +57,7 @@ OS_NAME=${os_name}
 VAULT_FILE="${VAULT_FILE}"
 VERIFIED_NETWORKING="${VERIFIED_NETWORKING}"
 QUBINODE_ANSIBLE_VARS="${QUBINODE_ANSIBLE_VARS}"
-yum_packages="python3-pyyaml python3 python3-pip python3-dns ansible git podman python-podman-api toolbox"
-rhel7_packages="python python3-pip python2-pip python-dns"
-pip_packages="yml2json"
-rhel8_repos="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
+YUM_PACKAGES="python3-pyyaml python3 python3-pip python3-dns ansible git podman python-podman-api toolbox"
+RHEL7_PACKAGES="python python3-pip python2-pip python-dns"
+PIP_PACKAGES="yml2json"
+RHEL8_REPOS="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
