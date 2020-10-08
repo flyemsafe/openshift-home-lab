@@ -103,58 +103,122 @@ function getPrimaryDisk ()
     ALL_DISK="${DISKS[@]}"
 }
 
+
+## Came across this Gist that provides the functions tonum and toaddr
+## # https://gist.githubusercontent.com/cskeeters/278cb27367fbaa21b3f2957a39087abf/raw/9cb338b28d041092391acd78e451a45d31a1917e/broadcast_calc.sh
+
+function toaddr () 
+{
+    b1=$(( ($1 & 0xFF000000) >> 24))
+    b2=$(( ($1 & 0xFF0000) >> 16))
+    b3=$(( ($1 & 0xFF00) >> 8))
+    b4=$(( $1 & 0xFF ))
+    eval "$2=\$b1.\$b2.\$b3.\$b4"
+}
+
+function tonum () 
+{
+    if [[ $1 =~ ([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+) ]]; then
+        addr=$(( (${BASH_REMATCH[1]} << 24) + (${BASH_REMATCH[2]} << 16) + (${BASH_REMATCH[3]} << 8) + ${BASH_REMATCH[4]} ))
+        eval "$2=\$addr"
+    fi
+}
+
+
+function return_netmask_ipaddr ()
+{
+
+    local __input="${1:-none}"  
+
+    if [[ __input =~ ^([0-9\.]+)/([0-9]+)$ ]]; then
+        # CIDR notation
+        IPADDR=${BASH_REMATCH[1]}
+        NETMASKLEN=${BASH_REMATCH[2]}
+        zeros=$((32-NETMASKLEN))
+        NETMASKNUM=0
+        for (( i=0; i<$zeros; i++ )); do
+            NETMASKNUM=$(( (NETMASKNUM << 1) ^ 1 ))
+        done
+        NETMASKNUM=$((NETMASKNUM ^ 0xFFFFFFFF))
+        toaddr $NETMASKNUM NETMASK
+    else
+        IPADDR=${1:-192.168.1.1}
+        NETMASK=${2:-255.255.255.0}
+    fi
+
+    tonum $IPADDR IPADDRNUM
+    tonum $NETMASK NETMASKNUM
+    NETWORKNUM=$(( IPADDRNUM & NETMASKNUM ))
+    toaddr $NETWORKNUM NETWORK
+    
+}
+
 ##---------------------------------------------------------------------
 ## Get network information
 ##---------------------------------------------------------------------
-get_primary_interface () 
+function get_primary_interface () 
 {
+    ## Default Vars
+    netdevice="${NETWORK_DEVICE:-none}"
+    ipaddress="${IPADDRESS:-none}"
+    gateway="${GATEWAY:-none}"
+    network="${NETWORK:-none}"
+    macaddr="${MACADDR:-none}"
+    netmask="${NETMASK:-none}"
+    reverse_zone="${REVERSE_ZONE:-none}"
+
     ## Get all interfaces except wireless and bridge
     declare -a INTERFACES=()
     mapfile -t INTERFACES < <(ip link | \
 	    awk -F: '$0 !~ "lo|vir|wl|^[^0-9]"{print $2;getline}'|\
 	    sed -e 's/^[[:space:]]*//')
     ALL_INTERFACES="${INTERFACES[@]}"
-    
-    if [[ "A${NETWORK_DEVICE-}" == "A" ]] || [[ "A${NETWORK_DEVICE-}" == 'A""' ]]
+
+    ## Get primary network device
+    ## Get ipaddress, netmask, netmask cidr prefix
+    if [ "A${netdevice}" == "Anone" ]
     then
         netdevice=$(ip route get 8.8.8.8 | awk -- '{printf $5}')
-    else
-        netdevice="${NETWORK_DEVICE-}"
+        IPADDR_NETMASK=$(ip -o -f inet addr show "$netdevice" | awk '/scope global/ {print $4}')
+        NETMASK_PREFIX=$(echo $IPADDR_NETMASK | awk -F'/' '{print $2}')
+        ## Return netmask and ipaddress
+        return_netmask_ipaddr $IPADDR_NETMASK
     fi
 
-    if [[ "A${IPADDRESS-}" == "A" ]] || [[ "A${IPADDRESS-}" == 'A""' ]]
+    ## Set ipaddress varaible
+    if [ "A${ipaddress}" == "Anone" ]
     then
-        ipaddress=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
-    else
-        ipaddress="${IPADDRESS-}"
+        ipaddress="${IPADDR}"
     fi
 
-    if [[ "A${GATEWAY-}" == "A" ]] || [[ "A${GATEWAY-}" == 'A""' ]]
+    ## Set netmask address
+    if [ "A${netmask}" == "Anone" ]
+    then
+        netmask="${NETMASK}"
+    fi
+
+    ## set gateway
+    if [ "A${gateway}" == "Anone" ]
     then
         gateway=$(ip route get 8.8.8.8 | awk -F"via " 'NR==1{split($2,a," ");print a[1]}')
-    else
-        gateway="${GATEWAY-}"
     fi
 
-    if [[ "A${NETWORK-}" == "A" ]] || [[ "A${NETWORK-}" == 'A""' ]]
+    ## network 
+    if [ "A${network}" == "Anone" ]
     then
-        network=$(ip route | awk -F'/' "/$ipaddress/ {print \$1}")
-    else
-        network="${NETWORK-}"
+        network="$NETWORK"
     fi
 
-    if [[ "A${REVERSE_ZONE-}" == "A" ]] || [[ "A${REVERSE_ZONE-}" == 'A""' ]]
+    ## reverse zone
+    if [ "A${reverse_zone}" == "Anone" ]
     then
         reverse_zone=$(echo "$network" | awk -F . '{print $4"."$3"."$2"."$1".in-addr.arpa"}'| sed 's/^[^.]*.//g')
-    else
-        reverse_zone="${REVERSE_ZONE-}"
     fi
 
-    if [[ "A${NETWORK_DEVICE-}" == "A" ]] || [[ "A${NETWORK_DEVICE-}" == 'A""' ]]
+    ## mac address
+    if [ "A${macaddr}" == "Anone" ]
     then
         macaddr=$(ip addr show $netdevice | grep link | awk '{print $2}' | head -1)
-    else
-        macaddr="${MACADDR}"
     fi
 
     ## Verify networking
@@ -173,6 +237,7 @@ function verify_networking () {
     printf "%s\n" "  ${blu}NETWORK_DEVICE${end}=${cyn}${netdevice:?}${end}"
     printf "%s\n" "  ${blu}IPADDRESS${end}=${cyn}${ipaddress:?}${end}"
     printf "%s\n" "  ${blu}GATEWAY${end}=${cyn}${gateway:?}${end}"
+    printf "%s\n" "  ${blu}NETMASK${end}=${cyn}${netmask:?}${end}"
     printf "%s\n" "  ${blu}NETWORK${end}=${cyn}${network:?}${end}"
     printf "%s\n\n" "  ${blu}MACADDR${end}=${cyn}${macaddr:?}${end}"
     confirm "  Would you like to change these details? ${cyn}yes/no${end}"
@@ -186,6 +251,7 @@ function verify_networking () {
                              "ipaddress - ${cyn}${ipaddress:?}${end}" \
                              "gateway   - ${cyn}${gateway:?}${end}" \
                              "network   - ${cyn}${network:?}${end}" \
+                             "netmask   - ${cyn}${netmask:?}${end}" \
                              "macaddr   - ${cyn}${macaddr:?}${end}" \
                              "Reset     - Revert changes" \
                              "Save      - Save changes")
@@ -206,7 +272,7 @@ function verify_networking () {
                     ;;
                 network)
             	    echo "network=$network" >> $tmp_file
-                    onfirm_correct "Enter the netmask cidr for ip ${ipaddress}" network
+                    confirm_correct "Enter the netmask cidr for ip ${ipaddress}" network
                     ;;
                 macaddr)
             	    echo "macaddr=$macaddr" >> $tmp_file
@@ -263,10 +329,13 @@ function check_rhsm_status () {
 	if sudo subscription-manager status | grep -q 'Overall Status: Current'
         then
 	    SYSTEM_REGISTERED=yes
+	    local MSG="$(hostname) is registered to Red Hat"
 	else
 	    SYSTEM_REGISTERED=no
+	    local MSG="$(hostname) is not registered to Red Hat"
         fi
     fi
+    printf "%s\n" "  ${yel}${MSG}${end}"
 }
 
 function verify_rhsm_status () {
@@ -436,12 +505,11 @@ function read_sensitive_data () {
     done
 }
 
-function check_vault_values () {
-    ANSIBLE_VAULT_CMD_EXIST=no
+function load_vault_vars () 
+{
     vault_parse_cmd="cat"
     if which ansible-vault >/dev/null 2>&1
     then
-        ANSIBLE_VAULT_CMD_EXIST=yes
         if ansible-vault view "${VAULT_FILE}" >/dev/null 2>&1
         then
 	    vault_parse_cmd="ansible-vault view"
@@ -482,6 +550,9 @@ function rhsm_get_reg_method () {
 }
 
 function accept_sensitive_input () {
+    printf "%s\n" ""
+    printf "%s\n" "  Try not to ${cyn}Backspace${end} to correct a typo, "
+    printf "%s\n\n" "  you will be prompted again if the input does not match."
     while true
     do
         printf "%s" "  $MSG_ONE"
@@ -554,8 +625,7 @@ function ask_for_admin_user_pass () {
     if [[ "A${ADMIN_USER_PASS-}" == 'A""' ]] || [[ "A${ADMIN_USER_PASS-}" == 'A' ]]
     then
         printf "%s\n\n" ""
-        printf "%s\n" "  When entering passwords, do not ${cyn}Backspace${end}."
-        printf "%s\n" "  Use ${cyn}Ctrl-c${end} to cancel then run the installer again."
+        printf "%s\n" "  Admin User Credentials"
 	printf "%s\n" "  ${blu}***********************************************************${end}"
         printf "%s\n" "  Your username ${cyn}${ADMIN_USER}${end} will be used to ssh into all the VMs created."
 
@@ -635,18 +705,21 @@ function check_additional_storage () {
 }
 
 function ask_idm_password () {
+
+    idm_user_pass="${IDM_USER_PASS:-none}"
     # root user password to be set for virtual instances created
-    if [[ "A${IDM_USER_PASS}" == 'A""' ]] || [[ "A${IDM_USER_PASS}" == 'A' ]]
+    if [ "A${idm_user_pass}" == "Anone" ]
     then
         printf "%s\n\n" ""
         printf "%s\n" "  When entering passwords, do not ${blu}Backspace${end}."
         printf "%s\n" "  Use ${blu}Ctrl-c${end} to cancel then run the installer again."
-        unset IDM_USER_PASS
+        unset idm_user_pass
         printf "%s\n" "  ${blu}**************************************************${end}"
         MSG_ONE="Enter a password for the IdM server ${blu}${IDM_SERVER_HOSTNAME-}.${DOMAIN-}${end} ${cyn}[ENTER]${end}:"
         MSG_TWO="Enter a password again for the IdM server ${blu}${IDM_SERVER_HOSTNAME-}.${DOMAIN-}${end} ${cyn}[ENTER]${end}:"
         accept_sensitive_input
-        IDM_USER_PASS="${USER_INPUT2}"
+        idm_user_pass="${USER_INPUT2}"
+        IDM_USER_PASS="${idm_user_pass}"
     fi
 }
 
