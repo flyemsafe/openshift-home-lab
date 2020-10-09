@@ -59,19 +59,23 @@ CURRENT_USER=$(whoami)
 # shellcheck disable=SC2034  # called when vault file is generated
 RANDOM_GENERATED_PASS=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 8)
 
-## Load existing vars
-if [ -f "$QUBINODE_BASH_VARS" ]
-then
-    set -o allexport
-    # shellcheck disable=SC1091
-    # shellcheck source=playbooks/vars/qubinode_vars.yml
-    source "$QUBINODE_BASH_VARS"
-    set +o allexport
-fi
 
 ## this function ensure the system is ready for ansible and python
 ## in addition it collects all the required information required
 function qubinode_baseline () {
+    ## Load existing vars
+    if [ -f "$QUBINODE_BASH_VARS" ]
+    then
+        set -o allexport
+        # shellcheck disable=SC1091
+        # shellcheck source=playbooks/vars/qubinode_vars.yml
+        source "$QUBINODE_BASH_VARS"
+        set +o allexport
+    fi
+
+    ## load variables from vault
+    load_vault_vars
+
     ## This file consist of functions that are used throughout th code base
     ## declare defaults for required vars
     ADMIN_USER="${ADMIN_USER:-$CURRENT_USER}"
@@ -80,8 +84,6 @@ function qubinode_baseline () {
     domain_tld="${DOMAIN_TLD:-lan}"
     generated_domain="${ADMIN_USER}.${domain_tld}"
     name_prefix="${NAME_PREFIX:-qbn}"
-    idm_hostname_prefix="${IDM_HOSTNAME_PREFIX:-idm01}"
-    GENERATED_IDM_HOSTNAME="${name_prefix}-${idm_hostname_prefix}"
 
     ## check if ansible is installed
     if which ansible > /dev/null 2>&1
@@ -111,9 +113,6 @@ function qubinode_baseline () {
 
     ## OS Check
     pre_os_check
-
-    ## load variables from vault
-    load_vault_vars
 
     ## Check system registration status
     check_rhsm_status
@@ -183,7 +182,7 @@ function qubinode_vars () {
     sed -i 's/"no"/no/g' "$QUBINODE_ANSIBLE_VARS"
     
     ## Generate JSON for future use
-    if which yml2json
+    if which yml2json > /dev/null 2>&1
     then
         yml2json "$QUBINODE_ANSIBLE_VARS" --pretty --output "$QUBINODE_ANSIBLE_JSON"
     fi

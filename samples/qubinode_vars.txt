@@ -23,14 +23,18 @@ REVERSE_ZONE="${reverse_zone}"
 ## Varibles for DNS server
 ##---------------------------------------------------------------------
 DOMAIN_TLD="${DOMAIN_TLD:-lan}"
-IDM_HOSTNAME_PREFIX="${IDM_HOSTNAME_PREFIX:-idm01}"
 REVERSE_ZONE="${reverse_zone}"
 DOMAIN="${DOMAIN:-$generated_domain}"
+
+##---------------------------------------------------------------------
+## Varibles for IdM server
+##---------------------------------------------------------------------
+IDM_HOSTNAME_PREFIX="${idm_hostname_prefix:-idm01}"
 DEPLOY_IDM="${DEPLOY_IDM:-yes}"
-IDM_SERVER_HOSTNAME="${IDM_SERVER_HOSTNAME:-$GENERATED_IDM_HOSTNAME}"
-IDM_ADMIN_USER="${IDM_ADMIN_USER:-admin}"
-ALLOW_ZONE_OVERLAP="${ALLOW_ZONE_OVERLAP:-no}"
-IDM_SERVER_IP="${IDM_SERVER_IP-}"
+IDM_SERVER_HOSTNAME="${idm_server_hostname:-$generated_idm_hostname}"
+IDM_ADMIN_USER="${idm_admin_user:-admin}"
+IDM_SERVER_IP="${idm_server_ip:-none}"
+ALLOW_ZONE_OVERLAP="${allow_zone_overlap:-none}"
 USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP:-yes}"
 IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD:-no}"
 USE_EXISTING_IDM="${USE_EXISTING_IDM:-no}"
@@ -67,3 +71,6 @@ YUM_PACKAGES="python3-pyyaml python3 python3-pip python3-dns ansible git podman 
 RHEL7_PACKAGES="python python3-pip python2-pip python-dns"
 PIP_PACKAGES="yml2json"
 RHEL8_REPOS="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
+LIBVIRT_DIR_VERIFY="${libvirt_dir_verify:-yes}"
+CONFIRMED_USER_DOMAIN="${confirmed_user_domain:-yes}"
+IDM_EXISTING_ADMIN_USER="${idm_admin_existing_user:-none}"

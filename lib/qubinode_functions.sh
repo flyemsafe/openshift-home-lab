@@ -127,10 +127,7 @@ function tonum ()
 
 function return_netmask_ipaddr ()
 {
-
-    local __input="${1:-none}"  
-
-    if [[ __input =~ ^([0-9\.]+)/([0-9]+)$ ]]; then
+    if [[ $1 =~ ^([0-9\.]+)/([0-9]+)$ ]]; then
         # CIDR notation
         IPADDR=${BASH_REMATCH[1]}
         NETMASKLEN=${BASH_REMATCH[2]}
@@ -150,7 +147,6 @@ function return_netmask_ipaddr ()
     tonum $NETMASK NETMASKNUM
     NETWORKNUM=$(( IPADDRNUM & NETMASKNUM ))
     toaddr $NETWORKNUM NETWORK
-    
 }
 
 ##---------------------------------------------------------------------
@@ -403,6 +399,34 @@ function register_system () {
 ##---------------------------------------------------------------------
 ## Get User Input
 ##---------------------------------------------------------------------
+function confirm_menu_option () 
+{
+    entry_is_correct=""
+    local __input_array="$1"
+    local __input_question=$2
+    local __resultvar="$3"
+
+    local data_array=($__input_array)
+    #mapfile -t data_array < echo "${__input_array}"
+    while [[ "${entry_is_correct}" != "yes" ]];
+    do
+        ## Get input from user
+	printf "%s\n" " ${__input_question}"
+        createmenu "${data_array[@]}"
+        user_choice=$(echo "${selected_option}"|awk '{print $1}')
+        if [[ "$__resultvar" ]]; then
+            eval $__resultvar="'$user_choice'"
+        else
+            echo "$user_choice"
+        fi
+
+        read -r -p "  You entered ${cyn}$user_choice${end}, is this correct? ${cyn}yes/no${end} " response
+        if [[ $response =~ ^([yy][ee][ss]|[yy])$ ]]
+        then
+            entry_is_correct="yes"
+        fi
+    done
+}
 
 ## confirm with user if they want to continue
 function confirm () {
@@ -430,7 +454,7 @@ function accept_user_input ()
 {
     local __questionvar="$1"
     local __resultvar="$2"
-    echo -n "  ${blu}${__questionvar}${end} and press ${cyn}[ENTER]${end}: "
+    echo -n "  ${__questionvar} and press ${cyn}[ENTER]${end}: "
     read input_from_user
     local output_data="$input_from_user"
 
@@ -445,7 +469,7 @@ function accept_user_input ()
 function confirm_correct () {
     entry_is_correct=""
     local __user_question=$1
-    local __resultvar="$2"
+    local __resultvar=$2
 
     while [[ "${entry_is_correct}" != "yes" ]];
     do
@@ -518,17 +542,17 @@ function load_vault_vars ()
 
     if [ -f "${VAULT_FILE}" ]
     then
-        RHSM_USERNAME=$($vault_parse_cmd "${VAULT_FILE}" | awk '/rhsm_username:/ {print $2}')
-        RHSM_PASSWORD=$($vault_parse_cmd "${VAULT_FILE}" | awk '/rhsm_password:/ {print $2}')
-        RHSM_ORG=$($vault_parse_cmd "${VAULT_FILE}" | awk '/rhsm_org:/ {print $2}')
-        RHSM_ACTKEY=$($vault_parse_cmd "${VAULT_FILE}" | awk '/rhsm_activationkey:/ {print $2}')
-        ADMIN_USER_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/admin_user_password:/ {print $2}')
-        IDM_SSH_USER=$($vault_parse_cmd "${VAULT_FILE}" | awk '/idm_ssh_user:/ {print $2}')
-        IDM_DM_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/idm_dm_pwd:/ {print $2}')
-        IDM_ADMIN_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/idm_admin_pwd:/ {print $2}')
-        TOWER_PG_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/tower_pg_password:/ {print $2}')
-        TOWER_MQ_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/tower_rabbitmq_password:/ {print $2}')
-        IDM_USER_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/idm_admin_pwd:/ {print $2}')
+        RHSM_USERNAME=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^rhsm_username:/ {print $2}')
+        RHSM_PASSWORD=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^rhsm_password:/ {print $2}')
+        RHSM_ORG=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^rhsm_org:/ {print $2}')
+        RHSM_ACTKEY=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^rhsm_activationkey:/ {print $2}')
+        ADMIN_USER_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^admin_user_password:/ {print $2}')
+        IDM_SSH_USER=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^idm_ssh_user:/ {print $2}')
+        IDM_DM_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^idm_dm_pwd:/ {print $2}')
+        IDM_ADMIN_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^idm_admin_pwd:/ {print $2}')
+        TOWER_PG_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^tower_pg_password:/ {print $2}')
+        TOWER_MQ_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^tower_rabbitmq_password:/ {print $2}')
+        #IDM_USER_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^idm_admin_pwd:/ {print $2}')
     fi
 }
 
@@ -561,7 +585,11 @@ function accept_sensitive_input () {
         printf "%s" "  $MSG_TWO"
         read_sensitive_data
         USER_INPUT2="${sensitive_data}"
-        [ "$USER_INPUT1" == "$USER_INPUT2" ] && break
+        if [ "$USER_INPUT1" == "$USER_INPUT2" ] 
+        then
+	    sensitive_data="$USER_INPUT2"
+	    break
+	fi
         printf "%s\n"  "  ${cyn}Please try again${end}: "
         printf "%s\n"
     done
@@ -582,7 +610,7 @@ function rhsm_credentials_prompt () {
 	    MSG_ONE="Enter your RHSM password and press ${cyn}[ENTER]${end}:"
             MSG_TWO="Enter your RHSM password password again ${cyn}[ENTER]${end}:"
 	    accept_sensitive_input
-            RHSM_PASSWORD="${USER_INPUT2}"
+            RHSM_PASSWORD="${sensitive_data}"
         fi
 
 	## set registration argument
@@ -597,7 +625,7 @@ function rhsm_credentials_prompt () {
 	    MSG_ONE="Enter your RHSM org id and press ${cyn}[ENTER]${end}:"
             MSG_TWO="Enter your RHSM org id again ${cyn}[ENTER]${end}:"
 	    accept_sensitive_input
-            RHSM_ORG="${USER_INPUT2}"
+            RHSM_ORG="${sensitive_data}"
         fi
 
         if [[ "A${RHSM_ACTKEY-}" == 'A""' ]] || [[ "A${RHSM_ACTKEY-}" == 'A' ]]
@@ -621,8 +649,9 @@ function ask_user_for_rhsm_credentials () {
 }
 
 function ask_for_admin_user_pass () {
+    admin_user_password="${ADMIN_USER_PASS:-none}"
     # root user password to be set for virtual instances created
-    if [[ "A${ADMIN_USER_PASS-}" == 'A""' ]] || [[ "A${ADMIN_USER_PASS-}" == 'A' ]]
+    if [ "A${admin_user_password}" == "Anone" ]
     then
         printf "%s\n\n" ""
         printf "%s\n" "  Admin User Credentials"
@@ -632,7 +661,7 @@ function ask_for_admin_user_pass () {
         MSG_ONE="Enter a password for ${cyn}${ADMIN_USER}${end} ${blu}[ENTER]${end}:"
         MSG_TWO="Enter a password again for ${cyn}${ADMIN_USER}${end} ${blu}[ENTER]${end}:"
         accept_sensitive_input
-        ADMIN_USER_PASS="$USER_INPUT2"
+        admin_user_password="$sensitive_data"
     fi
 }
 
@@ -650,13 +679,16 @@ function check_additional_storage () {
         printf "%s\n\n" ""
         printf "%s\n" "  ${blu}***********************************************************${end}"
         printf "%s\n\n" "  ${blu}Location for Libvirt directory Pool${end}"
-        printf "%s\n" "   The current path is set to ${cyn}$libvirt_dir${end}."
+        printf "%s\n" "  The current path is set to ${cyn}$libvirt_dir${end}."
         printf "%s\n" ""
-        confirm "   Do you want to change it? ${blu}yes/no${end}"
+        confirm "  Do you want to change it? ${blu}yes/no${end}"
         if [ "A${response}" == "Ayes" ]
         then
 	    confirm_correct "Enter a new path" LIBVIRT_DIR
+	    libvirt_dir_verify=no
 	fi
+    else
+        libvirt_dir_verify=no
     fi
 
     if [[ "A${create_libvirt_lvm}" == "Ayes" ]] && [[ "A${libvirt_pool_disk}" == "Anone" ]]
@@ -705,191 +737,196 @@ function check_additional_storage () {
 }
 
 function ask_idm_password () {
-
-    idm_user_pass="${IDM_USER_PASS:-none}"
-    # root user password to be set for virtual instances created
-    if [ "A${idm_user_pass}" == "Anone" ]
+    idm_admin_pass="${IDM_ADMIN_PASS:=none}"
+    if [ "A${IDM_ADMIN_PASS}" == "Anone" ]
     then
-        printf "%s\n\n" ""
-        printf "%s\n" "  When entering passwords, do not ${blu}Backspace${end}."
-        printf "%s\n" "  Use ${blu}Ctrl-c${end} to cancel then run the installer again."
-        unset idm_user_pass
-        printf "%s\n" "  ${blu}**************************************************${end}"
-        MSG_ONE="Enter a password for the IdM server ${blu}${IDM_SERVER_HOSTNAME-}.${DOMAIN-}${end} ${cyn}[ENTER]${end}:"
-        MSG_TWO="Enter a password again for the IdM server ${blu}${IDM_SERVER_HOSTNAME-}.${DOMAIN-}${end} ${cyn}[ENTER]${end}:"
+        printf "%s\n" ""
+        MSG_ONE="Enter a password for the IdM server ${cyn}${idm_server_hostname}${end} ${blu}[ENTER]${end}:"
+        MSG_TWO="Enter a password again for the IdM server ${cyn}${idm_server_hostname}${end} ${blu}[ENTER]${end}:"
         accept_sensitive_input
-        idm_user_pass="${USER_INPUT2}"
-        IDM_USER_PASS="${idm_user_pass}"
+        idm_admin_pwd="${sensitive_data}"
     fi
 }
 
 function set_idm_static_ip () {
     printf "%s\n" ""
-    confirm_correct "$static_ip_msg" IDM_SERVER_IP
-    if [ "A${IDM_SERVER_IP}" != "A" ]
+    confirm_correct "$static_ip_msg" idm_server_ip
+    if [ "A${idm_server_ip}" != "A" ]
     then
-        printf "%s\n" "  The qubinode-installer will connect to the IdM server on ${cyn}$IDM_SERVER_IP${end}"
+        printf "%s\n" "  The qubinode-installer will connect to the IdM server on ${cyn}$idm_server_ip${end}"
     fi
 }
 
-function confirm_user_domain () {
-    if [ "A${confirmation_question}" != "Anull" ]
-    then
-        echo -n "   ${confirmation_question}: "
-        read USER_DOMAIN
-        confirm_correct "  You entered ${cyn}$USER_DOMAIN${end}, is this correct? ${cyn}yes/no${end}"
-        if [ "A${response}" == "Ayes" ]
-        then
-            DOMAIN="$USER_DOMAIN"
-        fi
-    fi
-}
 
-function ask_about_domain() {
+function ask_about_domain() 
+{
     domain_tld="${DOMAIN_TLD:-lan}"
     generated_domain="${ADMIN_USER}.${domain_tld}"
-    printf "%s\n\n" ""
-    printf "%s\n" "  ${blu}***********************************************************${end}"
-    printf "%s\n\n" "  ${blu}DNS Domain${end}"
+    domain="${DOMAIN:-$generated_domain}"
+    confirmed_user_domain="${CONFIRMED_USER_DOMAIN:-yes}"
+    confirmation_question=null
 
-    if [[ "A${USE_EXISTING_IDM-}" == "Ayes" ]]
+    if [ "A${confirmed_user_domain}" == "Ayes" ]
     then
-	confirmation_question="Enter your existing IdM server domain, e.g. example.com"
-    else
-        printf "%s\n" "   The domain ${cyn}${GENERATED_DOMAIN:-$generated_domain}${end} was generated for you."
-        confirm "   Do you want to change it? ${blu}yes/no${end}"
-        if [ "A${response}" == "Ayes" ]
-        then
-	    confirmation_question="Enter your domain name"
-        else
-            DOMAIN="${generated_domain}"
-	    confirmation_question=null
-        fi
-    fi
+        printf "%s\n\n" ""
+        printf "%s\n" "  ${blu}***********************************************************${end}"
+        printf "%s\n\n" "  ${blu}DNS Domain${end}"
 
-    ## run function asking user to enter domain
-    confirm_user_domain
+        if [[ "A${USE_EXISTING_IDM-}" == "Ayes" ]]
+        then
+            confirmation_question="Enter your existing IdM server domain, e.g. example.com"
+        else
+            printf "%s\n" "   The domain ${cyn}${generated_domain}${end} was generated for you."
+            confirm "   Do you want to change it? ${blu}yes/no${end}"
+            if [ "A${response}" == "Ayes" ]
+            then
+                confirmation_question="Enter your domain name"
+	    else
+		confirmed_user_domain=no
+	    fi
+        fi
+
+        ## Ask user to confirm domain
+        if [ "A${confirmation_question}" != "Anull" ]
+        then
+            confirm_correct "${confirmation_question}" USER_DOMAIN
+            if [ "A${USER_DOMAIN}" != "A" ]
+            then
+	        domain="$USER_DOMAIN"
+		confirmed_user_domain=no
+            fi
+        fi
+	
+    fi
+}
+
+function connect_existing_idm ()
+{
+    idm_hostname="${generated_idm_hostname:-none}"
+    static_ip_msg=" Enter the ip address for the existing IdM server"
+    if [ "A${idm_hostname}" != "Anone" ]
+    then
+        printf "%s\n\n" ""
+        printf "%s\n" "  Please provide the hostname of the existing IdM server."
+        printf "%s\n\n" "  For example if you IdM server is ${cyn}dns01.lab.com${end}, you should enter ${blu}dns01${end}."
+        local existing_msg="Enter the existing DNS server hostname"
+	confirm_correct "${existing_msg}" idm_server_hostname
+
+	## Get ip address for Idm server
+	get_idm_server_ip
+
+	## get_idm_admin_user
+	get_idm_admin_user
+
+	##get user password not working
+	ask_idm_password
+    fi
+}
+
+function get_idm_server_ip () 
+{
+    if [ "A${idm_server_ip}" == "Anone" ]
+    then
+        set_idm_static_ip
+    fi
+}
+
+function get_idm_admin_user ()
+{
+    ## set idm_admin_user vars
+    idm_admin_user="${IDM_ADMIN_USER:-admin}"
+    idm_admin_existing_user="${IDM_EXISTING_ADMIN_USER:-none}"
+
+    if [ "A${idm_admin_user}" == "Aadmin" -a "A${idm_admin_existing_user}" == "Anone" ]
+    then
+        printf "%s\n\n" ""
+        local admin_user_msg="What is the admin username for ${cyn}${idm_server_hostname}${end}?"
+	confirm_correct "$admin_user_msg" idm_admin_existing_user
+	idm_admin_user="$idm_admin_existing_user"
+    fi
 }
 
 
-function ask_about_idm() {
-
+function ask_about_idm ()
+{
     ## Default variables
     idm_server_ip="${IDM_SERVER_IP:-none}"
     allow_zone_overlap="${ALLOW_ZONE_OVERLAP:-none}"
+    deploy_idm="${DEPLOY_IDM:-yes}"
+    idm_deploy_method="${IDM_DEPLOY_METHOD:-none}"
+    idm_choices="deploy existing"
+    use_existing_idm="yes"
+    idm_hostname_prefix="${IDM_HOSTNAME_PREFIX:-idm01}"
+    idm_server_hostname="${IDM_SERVER_HOSTNAME:-none}"
+
+    ## set hostname
+    if [ "A${idm_server_hostname}" == "Anone" ]
+    then
+        generated_idm_hostname="${name_prefix}-${idm_hostname_prefix}"
+    fi
 
     ## Should IdM be deployed
-    if [[ "A${DEPLOY_IDM-}" == "Ayes" ]] || [[ "A${DEPLOY_IDM-}" != 'Ano' ]]
+    if [ "A${deploy_idm}" == "Ayes" -a "A${idm_deploy_method}" == "Anone " ]
     then
-	case "${IDM_DEPLOY_METHOD-}" in deploy|existing|no)
-            DEPLOY_IDM="no"
-	    ;;
-	*)
-            printf "%s\n" "  ${blu}***********************************************************${end}"
-            printf "%s\n\n" "  ${blu}Red Hat Identity Manager (IdM)${end}"
-            printf "%s\n" "  An IdM server can be deployed if LDAP is needed."
-            printf "%s\n" "  The installer can deploy or connect to an existing IdM server."
-            printf "%s\n" "  What would you like to do?"
-            idm_choices=('deploy' 'existing' 'no deployment')
-            createmenu "${idm_choices[@]}"
-            idm_choice=$(echo "${selected_option}"|awk '{print $1}')
-            confirm "  Continue with ${blu}$idm_choice${end} deployment of IdM server? ${blu}yes/no${end}"
-            if [ "A${response}" == "Ayes" ]
-            then
-                DEPLOY_IDM="yes"
-                IDM_DEPLOY_METHOD="${idm_choice}"
-		if [ "A${IDM_DEPLOY_METHOD}" == "Aexisting" ]
-		then
-		    USE_EXISTING_IDM=yes
-		else
-		    USE_EXISTING_IDM=no
-		fi
-            else
-                printf "%s\n" "  You can change configuration options $QUBINODE_BASH_VARS"
-                printf "%s\n" "  and run the installer again."
-            fi
-	    ;;
+        printf "%s\n" "  ${blu}***********************************************************${end}"
+        printf "%s\n\n" "  ${blu}Red Hat Identity Manager (IdM)${end}"
+
+	if [ "A${idm_deploy_method}" == "Anone" ]
+	then
+	    ## FOR FUTURE USE
+            ##printf "%s\n" "  CoreDNS is deployed is the default DNS server deployed."
+            ##printf "%s\n" "  If you would like to have access to LDAP, then you can deploy"
+	    ##printf "%s\n" "  Red Hat Identity manager (IdM)"
+            printf "%s\n" "  IdM is use as the dns server for all qubinode dns needs."
+            printf "%s\n\n" "  The installer can ${cyn}deploy${end} a local IdM server or connect to an ${cyn}existing${end} IdM server."
+            idm_msg="Do you want to ${cyn}deploy${end} a new IdM or connect to an ${cyn}existing${end}? "
+            confirm_menu_option "${idm_choices}" "${idm_msg}" idm_deploy_method
+        fi
+
+	## check idm setup method
+	case "$idm_deploy_method" in
+	    deploy)
+		deploy_new_idm
+	        ;;
+	    existing)
+		connect_existing_idm
+	        ;;
+	    *)
+                echo nothing > /dev/null
+		;;
 	esac
     fi
+}
 
-    ## Options for IDM server deployment
-    if [[ "A${USE_EXISTING_IDM-}" == "Ayes" ]]
-    then
-	if [ "A${IDM_EXISTING_HOSTNAME-}" == "A" -a "A${IDM_EXISTING_HOSTNAME-}" == 'A""' ]
-	then
-            printf "%s\n" "  Please provide the hostname of the existing IdM server."
-            printf "%s\n\n" "  For example if you IdM server is ${cyn}dns01.lab.com${end}, you should enter ${blu}dns01${end}."
-            read -p "  ${blu}Enter the existing DNS server hostname?${end} " IDM_NAME
-            idm_hostname="${IDM_NAME}"
-            confirm_correct "  You entered ${cyn}$idm_hostname${end}, is this correct? ${cyn}yes/no${end}"
-            if [ "A${response}" == "Ayes" ]
-            then
-                IDM_EXISTING_HOSTNAME="$idm_hostname"
-            fi
-	fi
-
-	if [ "A${idm_server_ip}" == "Anull" ]
-	then
-    	    ## Get the Idm server ip
-	    static_ip_msg=" Enter the ip address for the existing IdM server"
-    	    set_idm_static_ip
-	fi
-
-	if [ "A${IDM_EXISTING_ADMIN_USER-}" == "A" -a "A${IDM_EXISTING_ADMIN_USER-}" == 'A""' ]
-	then
-            read -p "  What is the your existing IdM server admin username? " IDM_USER
-            idm_admin_user=$IDM_USER
-            confirm_correct "  You entered $idm_admin_user, is this correct? ${cyn}yes/no${end}"
-            if [ "A${response}" == "Ayes" ]
-            then
-    	    IDM_EXISTING_ADMIN_USER="$idm_admin_user"
-            fi
-	fi
-
-	##get user password
-	ask_idm_password
-    fi
-
-    ### Deploy new IdM server
-    if [[ "A${IDM_DEPLOY_METHOD}" == "Adeploy" ]]
-    then
-	USE_EXISTING_IDM=no
-	if [ "A${idm_server_ip}" == "Anone" ]
-	then
-            printf "%s\n" ""
-            printf "%s\n" "  The IdM server will be assigned a dynamic ip address from"
-            printf "%s\n\n" "  your network. You can assign a static ip address instead."
-            confirm "  Would you like to assign a static ip address to the IdM server? ${cyn}yes/no${end}"
-            if [ "A${response}" == "Ayes" ]
-            then
-                static_ip_msg=" Enter the ip address you would like to assign to the IdM server"
-                set_idm_static_ip
-            fi
-	fi
-    fi
-
-    ## allow-zone-overlap
+function deploy_new_idm ()
+{
     if [ "A${idm_server_ip}" == "Anone" ]
     then
-        printf "%s\n" "  You can safely choose no for this next question."
-        printf "%s\n" "  Choose yes if you using an existing domain name."
-        confirm "  Would you like to enable allow-zone-overlap? ${cyn}yes/no${end}"
+        printf "%s\n" ""
+        printf "%s\n" "  The IdM server will be assigned a dynamic ip address from"
+        printf "%s\n\n" "  your network. You can assign a static ip address instead."
+        confirm "  Would you like to assign a static ip address to the IdM server? ${cyn}yes/no${end}"
         if [ "A${response}" == "Ayes" ]
         then
-             ALLOW_ZONE_OVERLAP=yes
-	else
-             ALLOW_ZONE_OVERLAP=no
+            static_ip_msg=" Enter the ip address you would like to assign to the IdM server"
+            set_idm_static_ip
         fi
     fi
 
-    # shellcheck disable=SC2034 # used when qubinode_vars.yml generated
-    #name_prefix="${NAME_PREFIX:-qbn}"
-    #idm_hostname_prefix="${IDM_HOSTNAME_PREFIX:-idm01}"
-    #GENERATED_IDM_HOSTNAME="${name_prefix}-${idm_hostname_prefix}"
-    #_IDM_SERVER_HOSTNAME="${IDM_EXISTING_HOSTNAME:-$GENERATED_IDM_HOSTNAME}"
+    if [ "A${allow_zone_overlap}" == "Anone" ]
+    then
+        printf "%s\n" ""
+        printf "%s\n\n" " ${cyn} You can safely choose no for this next question.${end}"
+        printf "%s\n" "  Choose ${cyn}yes${end} if ${cyn}$domain${end} is already in use on your network."
+        confirm "  Would you like to enable allow-zone-overlap? ${cyn}yes/no${end}"
+        if [ "A${response}" == "Ayes" ]
+        then
+             allow_zone_overlap=yes
+	else
+             allow_zone_overlap=no
+        fi
+   fi
 
-    ## shellcheck disable=SC2034 # used when qubinode_vars.yml generated
-    #_IDM_ADMIN_USER="${IDM_EXISTING_ADMIN_USER:-$ADMIN_USER}"
 }
 
 ##---------------------------------------------------------------------
