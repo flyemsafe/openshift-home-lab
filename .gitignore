@@ -27,3 +27,4 @@ rhsm_token
 .python/
 *.qcow2
 *.iso
+qubinode_vars.txt

@@ -48,6 +48,8 @@ else
 fi
 
 # GLOBAL Variables
+CURRENT_USER=$(whoami)
+vault_key_file="/home/${CURRENT_USER}/.vaultkey"
 VAULT_FILE="${project_dir:?}/playbooks/vars/qubinode_vault.yml"
 VAULT_SAMPLE_FILE="${project_dir:?}/samples/qubinode_vault.yml"
 QUBINODE_BASH_VARS="${project_dir:?}/qubinode_vars.txt"
@@ -55,7 +57,6 @@ QUBINODE_ANSIBLE_VARS="${project_dir:?}/playbooks/vars/qubinode_vars.yml"
 QUBINODE_ANSIBLE_JSON="${project_dir:?}/playbooks/vars/qubinode_vars.json"
 QUBINODE_BASH_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.txt"
 QUBINODE_ANSIBLE_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.yml"
-CURRENT_USER=$(whoami)
 # shellcheck disable=SC2034  # called when vault file is generated
 RANDOM_GENERATED_PASS=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 8)
 
@@ -63,6 +64,8 @@ RANDOM_GENERATED_PASS=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 8)
 ## this function ensure the system is ready for ansible and python
 ## in addition it collects all the required information required
 function qubinode_baseline () {
+
+
     ## Load existing vars
     if [ -f "$QUBINODE_BASH_VARS" ]
     then
@@ -102,14 +105,7 @@ function qubinode_baseline () {
     ask_for_admin_user_pass
 
     ## check sudoers status
-    HAS_SUDO=$(has_sudo)
-    if [ "A${HAS_SUDO}" != "Ahas_sudo__pass_set" ]
-    then
-        # shellcheck disable=SC2034 # used by function setup_sudoers
-        SUDOERS_SETUP=no
-        printf "%s\n\n\n" ""
-        setup_sudoers
-    fi
+    setup_sudoers "$admin_user_password"
 
     ## OS Check
     pre_os_check
@@ -190,6 +186,11 @@ function qubinode_vars () {
 
 function qubinode_vault_file () 
 {
+    if [ -f /usr/bin/ansible ] && [ ! -f "${vault_key_file}" ]
+    then
+        printf "%s\n" " Created ansible-vault password file ${vault_key_file}"
+        openssl rand -base64 512|xargs > "${vault_key_file}"
+    fi
 
     ## Generate an updated vault file
     TMP_VAULT_FILE=$(mktemp)
@@ -201,6 +202,10 @@ function qubinode_vault_file ()
     # shellcheck source=/dev/null
     . "$TMP_VAULT_FILE"
 
+    if ! ansible-vault view "${VAULT_FILE}" >/dev/null 2>&1
+    then
+        ansible-vault encrypt "${VAULT_FILE}" > /dev/null 2>&1
+    fi
 }
 
 qubinode_baseline
