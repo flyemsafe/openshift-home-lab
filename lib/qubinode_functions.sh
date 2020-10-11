@@ -912,7 +912,8 @@ function ask_about_idm ()
 		connect_existing_idm
 	        ;;
 	    *)
-                echo nothing > /dev/null
+                #echo nothing > /dev/null
+		break
 		;;
 	esac
     fi
