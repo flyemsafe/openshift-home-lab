@@ -572,6 +572,7 @@ function load_vault_vars ()
 }
 
 function rhsm_get_reg_method () {
+    local user_response
     printf "%s\n\n" ""
     printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
     printf "%s\n\n" "  ${blu:?}Red Hat Subscription Registration${end:?}"
@@ -584,8 +585,8 @@ function rhsm_get_reg_method () {
     printf "%s\n" "  ${blu:?}Choose a registration method${end:?}"
     rhsm_msg=("Activation Key" "Username and Password")
     createmenu "${rhsm_msg[@]}"
-    rhsm_reg_method="${selected_option}"
-    RHSM_REG_METHOD=$(echo "${rhsm_reg_method}"|awk '{print $1}')
+    user_response="${selected_option}"
+    RHSM_REG_METHOD=$(echo "${user_response}"|awk '{print $1}')
 }
 
 function accept_sensitive_input () {
@@ -612,15 +613,21 @@ function accept_sensitive_input () {
 
         
 function rhsm_credentials_prompt () {
-    if [ "A${RHSM_REG_METHOD-}" == "AUsername" ]
+
+    rhsm_reg_method="${RHSM_REG_METHOD:-none}"
+    rhsm_username="${RHSM_USERNAME:-none}"
+    rhsm_password="${RHSM_PASSWORD:-none}"
+    rhsm_org="${RHSM_ORG:-none}"
+    rhsm_actkey="${RHSM_ACTKEY:-none}"
+    if [ "A${rhsm_reg_method}" == "AUsername" ]
     then
-        if [[ "A${RHSM_USERNAME-}" == 'A""' ]] || [[ "A${RHSM_USERNAME-}" == 'A' ]]
+        if [ "A${rhsm_username}" == "Anone" ]
         then
             printf "%s\n" ""
 	    confirm_correct "Enter your RHSM username and press" RHSM_USERNAME
         fi
 
-        if [[ "A${RHSM_PASSWORD-}" == 'A""' ]] || [[ "A${RHSM_PASSWORD-}" == 'A' ]]
+        if [ "A${rhsm_password}" == 'Anone' ]
         then
 	    MSG_ONE="Enter your RHSM password and press ${cyn:?}[ENTER]${end:?}:"
             MSG_TWO="Enter your RHSM password password again ${cyn:?}[ENTER]${end:?}:"
@@ -632,9 +639,9 @@ function rhsm_credentials_prompt () {
 	RHSM_CMD_OPTS="--username=${RHSM_USERNAME} --password=${RHSM_PASSWORD}"
     fi
 
-    if [ "A${RHSM_REG_METHOD}" == "AActivation" ]
+    if [ "A${rhsm_reg_method}" == "AActivation" ]
     then
-        if [[ "A${RHSM_ORG-}" == 'A""' ]] || [[ "A${RHSM_ORG-}" == 'A' ]]
+        if [ "A${rhsm_org}" == 'Anone' ]
         then
             printf "%s\n\n" ""
 	    MSG_ONE="Enter your RHSM org id and press ${cyn:?}[ENTER]${end:?}:"
@@ -643,18 +650,20 @@ function rhsm_credentials_prompt () {
             RHSM_ORG="${sensitive_data}"
         fi
 
-        if [[ "A${RHSM_ACTKEY-}" == 'A""' ]] || [[ "A${RHSM_ACTKEY-}" == 'A' ]]
+        if [ "A${rhsm_actkey}" == 'Anone' ]
         then
 	    confirm_correct "Enter your RHSM activation key" RHSM_ACTKEY
         fi
 
 	## Set registration argument
-	RHSM_CMD_OPTS="--org=${RHSM_ORG-} --activationkey=${RHSM_ACTKEY}"
+	RHSM_CMD_OPTS="--org=${RHSM_ORG} --activationkey=${RHSM_ACTKEY}"
     fi
 }
 
 function ask_user_for_rhsm_credentials () {
-    if [[ "A${RHSM_REG_METHOD-}" == "A" ]] || [[ "A${RHSM_REG_METHOD-}" == 'A""' ]]
+    rhsm_reg_method="${RHSM_REG_METHOD:-none}"
+
+    if [ "A${rhsm_reg_method}" == "Anone" ]
     then
 	rhsm_get_reg_method
         rhsm_credentials_prompt

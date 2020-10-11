@@ -3,12 +3,12 @@
 ## your own vaulted variables
 
 ## when RHSM_REG_METHOD="Username"
-rhsm_username: ${RHSM_USERNAME:-''}
-rhsm_password: ${RHSM_PASSWORD:-''}
+rhsm_username: ${RHSM_USERNAME:-none}
+rhsm_password: ${RHSM_PASSWORD:-none}
 
 ## when RHSM_REG_METHOD="Activation"
-rhsm_org: ${RHSM_ORG:-'""'}
-rhsm_activationkey: ${RHSM_ACTKEY:-'""'}
+rhsm_org: ${RHSM_ORG:-none}
+rhsm_activationkey: ${RHSM_ACTKEY:-none}
 
 ## admin or current user password
 admin_user_password: ${admin_user_password:-none}
