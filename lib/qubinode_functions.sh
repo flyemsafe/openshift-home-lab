@@ -1191,6 +1191,10 @@ function qubinode_maintenance_options () {
     elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
     then
         cd "${project_dir}"
+	if [ ! -f playbooks/vars/kvm_host.yml ]
+	then
+	    cp samples/kvm_host.yml playbooks/vars/kvm_host.yml
+	fi
         ansible-playbook playbooks/kvmhost.yml
     elif [ "${qubinode_maintenance_opt}" == "rebuild_qubinode" ]
     then
