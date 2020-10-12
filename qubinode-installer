@@ -59,56 +59,59 @@ QUBINODE_BASH_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.txt"
 QUBINODE_ANSIBLE_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.yml"
 # shellcheck disable=SC2034  # called when vault file is generated
 RANDOM_GENERATED_PASS=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 8)
+ANSIBLE_REQUIREMENTS_FILE="${project_dir}/playbooks/requirements.yml"
+QUBINODE_INVENTORY_DIR="${project_dir}/inventory"
+QUBINODE_INVENTORY_FILE="${QUBINODE_INVENTORY_DIR}/hosts"
+QUBINODE_INVENTORY_SAMPLE_FILE="${project_dir}/samples/hosts"
+
+## Load existing vars
+if [ -f "$QUBINODE_BASH_VARS" ]
+then
+    set -o allexport
+    # shellcheck disable=SC1091
+    # shellcheck source=playbooks/vars/qubinode_vars.yml
+    source "$QUBINODE_BASH_VARS"
+    set +o allexport
+fi
+
+## load variables from vault
+## this should be refactored for speed, it currently takes 3 seconds to load
+load_vault_vars
+
+## OS Check
+pre_os_check
+
+
+## This file consist of functions that are used throughout th code base
+## declare defaults for required vars
+QUBINODE_ADMIN_USER="${QUBINODE_ADMIN_USER:-$CURRENT_USER}"
+ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-no}"
+PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-no}"
+domain_tld="${DOMAIN_TLD:-lan}"
+generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
+name_prefix="${NAME_PREFIX:-qbn}"
+
+## check if ansible is installed
+if which ansible > /dev/null 2>&1
+then
+  ANSIBLE_INSTALLED=yes
+fi
+
+## check if python3 is installed
+if which python3> /dev/null 2>&1
+then
+  PYTHON3_INSTALLED=yes
+fi
 
 
 ## this function ensure the system is ready for ansible and python
 ## in addition it collects all the required information required
 function qubinode_baseline () {
-
-
-    ## Load existing vars
-    if [ -f "$QUBINODE_BASH_VARS" ]
-    then
-        set -o allexport
-        # shellcheck disable=SC1091
-        # shellcheck source=playbooks/vars/qubinode_vars.yml
-        source "$QUBINODE_BASH_VARS"
-        set +o allexport
-    fi
-
-    ## load variables from vault
-    load_vault_vars
-
-    ## This file consist of functions that are used throughout th code base
-    ## declare defaults for required vars
-    ADMIN_USER="${ADMIN_USER:-$CURRENT_USER}"
-    ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-no}"
-    PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-no}"
-    domain_tld="${DOMAIN_TLD:-lan}"
-    generated_domain="${ADMIN_USER}.${domain_tld}"
-    name_prefix="${NAME_PREFIX:-qbn}"
-
-    ## check if ansible is installed
-    if which ansible > /dev/null 2>&1
-    then
-      ANSIBLE_INSTALLED=yes
-    fi
-    
-    ## check if python3 is installed
-    if which python3> /dev/null 2>&1
-    then
-      PYTHON3_INSTALLED=yes
-    fi
-    ## These functions will prompt the user
-
     ## get the password for the admin user   
     ask_for_admin_user_pass
 
     ## check sudoers status
     setup_sudoers "$admin_user_password"
-
-    ## OS Check
-    pre_os_check
 
     ## Check system registration status
     check_rhsm_status
@@ -118,23 +121,26 @@ function qubinode_baseline () {
     ## install required software dependancies
     install_packages
 
+    ## install ansible roles and collections
+    qubinode_setup_ansible
+
     ## Confirm storage setup
     #getPrimaryDisk
     check_additional_storage
     
-    ## Get main network interface details
-    get_primary_interface
-
     ## confirm if you want to use the generated domain    
     ask_about_domain
 
     ## ask if you want to deploy a IdM server for DNS and LDAP
     ask_about_idm
-    
+
+    ## Get main network interface details
+    get_primary_interface
 }
 
 ## this function generates the required vars file
 function qubinode_vars () {
+    echo "Generating vars"
     ## Generate bash variables file
     TMP_BASH_VARS_FILE=$(mktemp)
     CURRENT_BASH_VARS_FILE=$(mktemp)
@@ -182,6 +188,12 @@ function qubinode_vars () {
     then
         yml2json "$QUBINODE_ANSIBLE_VARS" --pretty --output "$QUBINODE_ANSIBLE_JSON"
     fi
+
+    ## Ensure inventory file exist
+    if [ ! -f "${QUBINODE_INVENTORY_SAMPLE_FILE}" ]
+    then
+        cp "$QUBINODE_INVENTORY_SAMPLE_FILE" "$QUBINODE_INVENTORY_FILE"
+    fi
 }
 
 function qubinode_vault_file () 
@@ -208,6 +220,93 @@ function qubinode_vault_file ()
     fi
 }
 
-qubinode_baseline
-qubinode_vars
-qubinode_vault_file
+function main ()
+{
+    # Exit if this is executed as the root user
+    if is_root 
+    then
+        echo "Error: qubi-installer should be run as a normal user, not as root!"
+    exit 1
+    fi
+
+    qubinode_product=false
+    NUM_ARGS="$#"
+    ALL_ARGS="$@"
+    while getopts ":c:dvhm:p:a:" opt;
+    do
+        case $opt in
+            a) 
+	        check_args;
+                full_deploy=true
+                product_options+=("$OPTARG")
+                ;;
+            c) 
+	       check_args
+               check=true
+               cluster=true
+               cluster_opt=$OPTARG
+               ;;
+            d) 
+	       check_args;
+               teardown=true
+               ;;
+            h) 
+	       display_help
+               exit 1
+               ;;
+            m) 
+	       check_args;
+               qubinode_maintenance=true
+               qubinode_maintenance_opt=$OPTARG;
+               ;;
+            p) 
+	       check_args
+               check=true
+               qubinode_product=true
+               qubinode_product_opt=$OPTARG
+               ;;
+            v) 
+	       check_args;
+               _V=1
+               ;;
+           --) 
+	       shift; 
+	       break
+	       ;;
+           -*) 
+	       echo Unrecognized flag : "$1" >&2
+               display_help
+               exit 1
+               ;;
+           \?) 
+	       echo Unrecognized flag : "$1" >&2
+               display_help
+               exit 1
+               ;;
+        esac
+    done
+    shift "$((OPTIND-1))" 
+
+    # If not arguments pass, run default option to install OpenShift
+    if (( "$OPTIND" == 1 ))
+    then
+	echo "$OPTIND"
+        #display_openshift_msg_ocp4
+    elif [ "A${qubinode_product}" == "Atrue" ] && [ "A${qubinode_maintenance}" == "Atrue" ]
+    then
+        product_maintenance="${qubinode_maintenance_opt}"
+        qubinode_product_deployment $qubinode_product_opt
+    elif [ "A${qubinode_maintenance}" == "Atrue" ]
+    then
+        qubinode_maintenance_options
+    elif [ "A${qubinode_product}" == "Atrue" ]
+    then
+        qubinode_product_deployment $qubinode_product_opt
+    else
+        display_help
+    fi
+
+}
+
+main "$@"
+

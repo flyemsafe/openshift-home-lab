@@ -39,7 +39,7 @@ function curl_download(){
 # starting the qubinode installer 
 function start_qubinode_install(){
     cd "${PROJECT_DIR}/"
-    ./"${PROJECT_NAME}" --setup
+    ./"${PROJECT_NAME}" -m setup
 }
 
 function git_clone_code(){

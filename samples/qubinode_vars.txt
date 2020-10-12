@@ -1,28 +1,34 @@
 ## none root user
-ADMIN_USER="${CURRENT_USER}"
+QUBINODE_ADMIN_USER="${CURRENT_USER}"
 
 ## all vms will be prefix with this name
 NAME_PREFIX="${NAME_PREFIX:-$name_prefix}"
+
+## Qubinode project folder
+QUBINODE_PROJECT_DIR="${project_dir:-none}"
 
 ##---------------------------------------------------------------------
 ## Variables for bridge network interface / set to override installer
 ##---------------------------------------------------------------------
 
-## Required
-NETWORK_DEVICE="${netdevice}"
-IPADDRESS="${ipaddress}"
-GATEWAY="${gateway}"
-NETMASK="${netmask}"
+## Required for bridge networking
+CREATE_LIBVIRT_BRIDGE="${create_libvirt_bridge:-no}"
+LIBVIRT_NETWORK_NAME="${libvirt_network_name:-default}"
+LIBVIRT_BRIDGE_NAME="${libvirt_bridge_name:-qubibr0}"
+
+NETWORK_DEVICE="${netdevice:-none}"
+IPADDRESS="${ipaddress:-none}"
+GATEWAY="${gateway:-none}"
+NETMASK="${netmask:-none}"
 
 ## optional
-MACADDR="${macaddr}"
-NETWORK="${network}"
-REVERSE_ZONE="${reverse_zone}"
+MACADDR="${macaddr:-none}"
+NETWORK="${network:-none}"
 
 ##---------------------------------------------------------------------
 ## Varibles for DNS server
 ##---------------------------------------------------------------------
-REVERSE_ZONE="${reverse_zone}"
+REVERSE_ZONE="${reverse_zone:-none}"
 DOMAIN="${domain:-$generated_domain}"
 
 ##---------------------------------------------------------------------
@@ -42,16 +48,17 @@ IDM_DEPLOY_METHOD="${idm_deploy_method:-none}"
 PRIMARY_DISK="${primary_disk}"
 LIBVIRT_DIR="${LIBVIRT_DIR}"
 LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK-none}"
-CREATE_LIBVIRT_LVM="${create_libvirt_lvm:-none}"
+CREATE_LIBVIRT_STORAGE="${create_libvirt_lvm:-none}"
+LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
 
 ##---------------------------------------------------------------------
 ## Varibles for RHSM
 ##---------------------------------------------------------------------
-RHSM_SYSTEM="${RHSM_SYSTEM}"
-RHEL_RELEASE="${rhel_release}"
-RHEL_MAJOR="${rhel_major}"
-SYSTEM_REGISTERED="${SYSTEM_REGISTERED}"
-RHSM_REG_METHOD="${RHSM_REG_METHOD}"
+RHSM_SYSTEM="${RHSM_SYSTEM:-no}"
+RHEL_RELEASE="${rhel_release:-none}"
+RHEL_MAJOR="${rhel_major:-none}"
+SYSTEM_REGISTERED="${SYSTEM_REGISTERED:-no}"
+RHSM_REG_METHOD="${RHSM_REG_METHOD:-none}"
 
 ##---------------------------------------------------------------------
 ## Only edit below if you know what you are doing

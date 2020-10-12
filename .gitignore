@@ -28,3 +28,4 @@ rhsm_token
 *.qcow2
 *.iso
 qubinode_vars.txt
+shellcheck

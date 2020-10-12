@@ -3,28 +3,26 @@
 ## This contains the majority of the functions required to
 ## get the system to a state where ansible and python is available
 
-#function config_err_msg () {
-#    cat << EOH >&2
-#  There was an error finding the full path to the qubinode-installer project directory.
-#EOH
-#}
-#
-## this function just make sure the script
-## knows the full path to the project directory
-## and runs the config_err_msg if it can't determine
-## that start_deployment.conf can find the project directory
-#function setup_required_paths () {
-#    project_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-#
-#    if [ ! -d "${project_dir}/playbooks/vars" ] ; then
-#        printf "%s\n" "  ${red:?}There was an error finding the full path to the qubinode-installer project directory${end:?}"
-#    fi
-#}
-
-
 ##---------------------------------------------------------------------
 ## Functions for setting up sudoers
 ##---------------------------------------------------------------------
+
+## returns zero/true if root user
+function is_root () {
+    return $(id -u)
+}
+
+# validates that the argument options are valid
+# e.g. if script -s-p pass, it won't use '-' as
+# an argument for -s
+function check_args () {
+    if [[ $OPTARG =~ ^-[p/c/h/d/a/v/m]$ ]]
+    then
+      echo "Invalid option argument $OPTARG, check that each argument has a value." >&2
+      exit 1
+    fi
+}
+
 function setup_sudoers () 
 {
    local __admin_pass="$1"
@@ -34,20 +32,20 @@ function setup_sudoers ()
        printf "%s\n" ""
        printf "%s\n" "  ${blu:?}Setup Sudoers${end:?}"
        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-       printf "%s\n" "  The qubinode-installer runs as a normal user. It sets up your username {ADMIN_USER}"
+       printf "%s\n" "  The qubinode-installer runs as a normal user. It sets up your username {QUBINODE_ADMIN_USER}"
        printf "%s\n" "  for passwordless sudo."
        printf "%s\n" ""
        SUDOERS_TMP=$(mktemp)
-       echo "${ADMIN_USER} ALL=(ALL) NOPASSWD:ALL" > "${SUDOERS_TMP}"
-       echo "$__admin_pass" | sudo -S test -f "/etc/sudoers.d/${ADMIN_USER}" > /dev/null 2>&1
-       echo "$__admin_pass" | sudo -S cp "${SUDOERS_TMP}" "/etc/sudoers.d/${ADMIN_USER}" > /dev/null 2>&1
-       echo "$__admin_pass" | sudo -S chmod 0440 "/etc/sudoers.d/${ADMIN_USER}" > /dev/null 2>&1
+       echo "${QUBINODE_ADMIN_USER} ALL=(ALL) NOPASSWD:ALL" > "${SUDOERS_TMP}"
+       echo "$__admin_pass" | sudo -S test -f "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
+       echo "$__admin_pass" | sudo -S cp "${SUDOERS_TMP}" "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
+       echo "$__admin_pass" | sudo -S chmod 0440 "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
    fi
 
    # check again
    if ! prompt=$(sudo -n ls 2>&1)
    then
-       printf "%s\n" "Setting up passwordless sudo for $ADMIN_USER was unsuccessful"
+       printf "%s\n" "Setting up passwordless sudo for $QUBINODE_ADMIN_USER was unsuccessful"
        printf "%s\n" "Error msg: $prompt"
        exit 1
    fi
@@ -144,7 +142,7 @@ function get_primary_interface ()
     gateway="${GATEWAY:-none}"
     network="${NETWORK:-none}"
     macaddr="${MACADDR:-none}"
-    netmask="${NETMASK:-none}"
+    netmask="${HOST_NETMASK:-none}"
     reverse_zone="${REVERSE_ZONE:-none}"
     confirm_networking="${CONFIRM_NETWORKING:-yes}"
 
@@ -189,7 +187,7 @@ function get_primary_interface ()
     ## network 
     if [ "A${network}" == "Anone" ]
     then
-        network="$NETWORK"
+        network="$(ipcalc -n "$IPADDR_NETMASK" | awk -F= '{print $2}')"
     fi
 
     ## reverse zone
@@ -212,10 +210,51 @@ function get_primary_interface ()
 }
 
 function verify_networking () {
+
+    ## defaults
+    libvirt_network_name="${libvirt_network_name:-default}"
+    libvirt_bridge_name="${libvirt_bridge_name:-qubibr0}"
+    create_libvirt_bridge="${create_libvirt_bridge:-yes}"
+
+    local libvirt_net_choices
+    local libvirt_net_selections
+    local libvirt_net_msg
+    libvirt_net_selections="Skip Specify Continue"
+    IFS=" " read -r -a libvirt_net_choices <<< "$libvirt_net_selections"
+    libvirt_net_msg=" Would you like to ${cyn:?}skip${end:?} or ${cyn:?}continue${end:?} the bridge network setup or ${cyn:?}specify${end:?} a libvirt network to use?"
+
     printf "%s\n\n" ""
     printf "%s\n" "  ${blu:?}Networking Details${end:?}"
     printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-    printf "%s\n\n" "  The below networking information was discovered and will be used for setting a bridge network."
+    printf "%s\n" "  The default libvirt network name is a nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
+    printf "%s\n" "  A bridge libvirt network is created to make it easy to access VM's running on the qubinode."
+    printf "%s\n\n" "  A bridge network is currently required Red Hat IdM server."
+    printf "%s\n" "  You can skip setting up a bridge network and use the default or specify your own."
+
+    confirm_menu_option "${libvirt_net_choices[*]}" "$libvirt_net_msg" libvirt_net_choice
+    if [ "A${libvirt_net_choice}" == "ASpecify" ]
+    then
+        confirm_correct "Type the name of a existing libvirt network you would like to use" libvirt_network_name
+        create_libvirt_bridge=no
+	confirm "  Is this a bridge network? ${cyn:?}yes/no${end:?}"
+        if [ "A${response}" == "Ayes" ]
+        then
+	    libvirt_bridge_name="${libvirt_network_name}"
+	fi
+    elif [ "A${libvirt_net_choice}" == "ASkip" ]
+    then
+        create_libvirt_bridge=no
+        printf "%s\n" " Using the libvirt nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
+    else
+	verify_bridge_networking
+    fi
+   
+}
+
+
+function verify_bridge_networking () {
+    printf "%s\n\n" "  The below networking information was discovered and will be used for creating a bridge network."
+
     
     printf "%s\n" "  ${blu:?}NETWORK_DEVICE${end:?}=${cyn:?}${netdevice:?}${end:?}"
     printf "%s\n" "  ${blu:?}IPADDRESS${end:?}=${cyn:?}${ipaddress:?}${end:?}"
@@ -223,6 +262,7 @@ function verify_networking () {
     printf "%s\n" "  ${blu:?}NETMASK${end:?}=${cyn:?}${netmask:?}${end:?}"
     printf "%s\n" "  ${blu:?}NETWORK${end:?}=${cyn:?}${network:?}${end:?}"
     printf "%s\n\n" "  ${blu:?}MACADDR${end:?}=${cyn:?}${macaddr:?}${end:?}"
+
     confirm "  Would you like to change these details? ${cyn:?}yes/no${end:?}"
     if [ "A${response}" == "Ayes" ]
     then
@@ -291,9 +331,10 @@ function pre_os_check () {
     # shellcheck disable=SC2034
     rhel_major=$(sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release)
     os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
+    RHSM_SYSTEM=no
     if [ "A${os_name}" == 'A"Red Hat Enterprise Linux"' ]
     then
-	RHSM_SYSTEM=yes
+        RHSM_SYSTEM=yes
         if ! which subscription-manager > /dev/null 2>&1
         then
             printf "%s\n" ""
@@ -301,15 +342,17 @@ function pre_os_check () {
             printf "%s\n" " ${red:?}The subscription-manager command is required.${end:?}"
 	    exit 1
 	fi
-    else
-        RHSM_SYSTEM=no
     fi
+
+    ## set rhsm system var
+    rhsm_system="$RHSM_SYSTEM"
 }
 
 	    
 function check_rhsm_status () {
     ## define message var
     local system_registered_msg
+    system_registered_msg="$(hostname) is registered to Red Hat"
     if [ "A${RHSM_SYSTEM-}" == 'Ayes' ]
     then
         printf "%s\n" ""
@@ -318,7 +361,6 @@ function check_rhsm_status () {
 	if sudo subscription-manager status | grep -q 'Overall Status: Current'
         then
 	    SYSTEM_REGISTERED=yes
-	    system_registered_msg="$(hostname) is registered to Red Hat"
 	else
 	    SYSTEM_REGISTERED=no
 	    system_registered_msg="$(hostname) is not registered to Red Hat"
@@ -366,8 +408,23 @@ function verify_rhsm_status () {
 }
 
 function register_system () {
+    ## set default rhsm system
+    rhsm_system="${RHSM_SYSTEM:-no}"
+    system_registered="${SYSTEM_REGISTERED:-no}"
 
-    if [ "A${RHSM_SYSTEM}" == "Ayes" ] && [ "A${SYSTEM_REGISTERED}" == "Ano" ]
+    if [ "${rhsm_system}" == "none" ]
+    then
+        pre_os_check
+        rhsm_system="${RHSM_SYSTEM:-no}"
+    fi
+
+    if [ "${system_registered}" == "no" ]
+    then
+        check_rhsm_status
+        system_registered="${SYSTEM_REGISTERED:-no}"
+    fi
+
+    if [ "A${rhsm_system}" == "Ayes" ] && [ "A${system_registered}" == "Ano" ]
     then
         printf "%s\n\n" ""
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
@@ -680,10 +737,10 @@ function ask_for_admin_user_pass () {
         printf "%s\n\n" ""
         printf "%s\n" "  Admin User Credentials"
 	printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n" "  Your username ${cyn:?}${ADMIN_USER}${end:?} will be used to ssh into all the VMs created."
+        printf "%s\n" "  Your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} will be used to ssh into all the VMs created."
 
-        MSG_ONE="Enter a password for ${cyn:?}${ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
-        MSG_TWO="Enter a password again for ${cyn:?}${ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
+        MSG_ONE="Enter a password for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
+        MSG_TWO="Enter a password again for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
         accept_sensitive_input
         admin_user_password="$sensitive_data"
     fi
@@ -691,12 +748,13 @@ function ask_for_admin_user_pass () {
 
 function check_additional_storage () {
     getPrimaryDisk
-    create_libvirt_lvm="${CREATE_LIBVIRT_LVM:-yes}"
+    create_libvirt_lvm="${CREATE_LIBVIRT_STORAGE:-yes}"
     libvirt_pool_disk="${LIBVIRT_POOL_DISK:-none}"
     libvirt_dir_verify="${LIBVIRT_DIR_VERIFY:-none}"
     libvirt_dir="${LIBVIRT_DIR:-/var/lib/libvirt/images}"
     LIBVIRT_DIR="${LIBVIRT_DIR:-$libvirt_dir}"
 
+    libvirt_pool_name="${libvirt_pool_name:-default}"
     # confirm directory for libvirt images
     if [ "A${libvirt_dir_verify}" != "Ano" ]
     then
@@ -704,11 +762,16 @@ function check_additional_storage () {
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         printf "%s\n\n" "  ${blu:?}Location for Libvirt directory Pool${end:?}"
         printf "%s\n" "  The current path is set to ${cyn:?}$libvirt_dir${end:?}."
-        printf "%s\n" ""
         confirm "  Do you want to change it? ${blu:?}yes/no${end:?}"
         if [ "A${response}" == "Ayes" ]
         then
 	    confirm_correct "Enter a new path" LIBVIRT_DIR
+	fi
+        printf "%s\n" "  The default libvirt dir pool name is ${cyn:?}$libvirt_pool_name${end:?}."
+        confirm "  Do you want to change it? ${blu:?}yes/no${end:?}"
+        if [ "A${response}" == "Ayes" ]
+        then
+	    confirm_correct "Enter the name of the libvirt dir pool you would like to use" libvirt_pool_name
 	fi
         libvirt_dir_verify=no
     fi
@@ -744,10 +807,11 @@ function check_additional_storage () {
             disk_msg="Please select secondary disk to be used"
             confirm_menu_option "${AVAILABLE_DISKS[*]}" "$disk_msg" libvirt_pool_disk
             LIBVIRT_POOL_DISK="$libvirt_pool_disk"
-            CREATE_LIBVIRT_LVM=yes
+            CREATE_LIBVIRT_STORAGE=yes
+	    create_libvirt_lvm="$CREATE_LIBVIRT_STORAGE"
 	else
             LIBVIRT_POOL_DISK="none"
-            CREATE_LIBVIRT_LVM=no
+            CREATE_LIBVIRT_STORAGE=no
         fi
     fi
 }
@@ -778,7 +842,7 @@ function set_idm_static_ip () {
 function ask_about_domain() 
 {
     domain_tld="${DOMAIN_TLD:-lan}"
-    generated_domain="${ADMIN_USER}.${domain_tld}"
+    generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
     domain="${DOMAIN:-$generated_domain}"
     confirmed_user_domain="${CONFIRMED_USER_DOMAIN:-yes}"
     confirmation_question=null
@@ -821,6 +885,7 @@ function ask_about_domain()
 function connect_existing_idm ()
 {
     idm_hostname="${generated_idm_hostname:-none}"
+    #idm_hostname="${idm_server_hostname:-none}"
     static_ip_msg=" Enter the ip address for the existing IdM server"
     allow_zone_overlap=no
     if [ "A${idm_hostname}" != "Anone" ]
@@ -954,15 +1019,25 @@ function deploy_new_idm ()
 ## YUM, PIP packages and Ansible roles, collections
 ##---------------------------------------------------------------------
 function install_packages () {
-
     ## default vars
     _rhel7_packages="python python3-pip python2-pip python-dns"
     _rhel8_repos="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
-    _yum_packages="python3-pyyaml python3 python3-pip python3-dns ansible git podman python-podman-api toolbox"
+    _yum_packages="python3-lxml python3-libvirt python3-netaddr ipcalc python3-pyyaml python3 python3-pip python3-dns ansible git podman python-podman-api toolbox python3-netaddr"
     rhel8_repos="${RHEL8_REPOS:-$_rhel8_repos}"
     pip_packages="${PIP_PACKAGES:-yml2json}"
     rhel7_packages="${RHEL7_PACKAGES:-$_rhel7_packages}"
     yum_packages="${YUM_PACKAGES:-$_yum_packages}"
+
+    # check if packages needs to be installed
+    pkg_is_missing=no
+    for pkg in $yum_packages
+    do
+        if ! rpm -qa | grep -q "$pkg"
+        then
+           pkg_is_missing=yes
+           break
+        fi
+    done
 
     # install python
     if [ "A${PYTHON3_INSTALLED-}" == "Ano" ] && [ "A${ANSIBLE_INSTALLED-}" == "Ano" ]
@@ -983,27 +1058,38 @@ function install_packages () {
                 fi
             done
 	fi
-
-	## RHEL7
-        if [[ $rhel_major == "7" ]]
-	then
-            if [ ! -f /usr/bin/python ]
-            then
-                printf "%s\n" "   ${yel:?}Installing required rpms..${end:?}"
-                sudo yum clean all > /dev/null 2>&1
-                sudo yum install -y -q -e 0 "$rhel7_packages" "$yum_packages"> /dev/null 2>&1
-            fi
-	fi
-
-	 ## Install on RHEL8 and fedora
-	 if [[ "A${OS_NAME-}" == "AFedora" ]] || [[ "$rhel_major" == "8" ]]
-         then
-             printf "%s\n" "   ${blu:?}Installing required python rpms..${end:?}"
-             sudo yum clean all > /dev/null 2>&1
-             sudo rm -r /var/cache/dnf
-             sudo yum install -y -q -e 0 "$yum_packages"> /dev/null 2>&1
-	 fi
     fi
+
+    ## RHEL7
+    if [[ $rhel_major == "7" ]]
+    then
+        if [ ! -f /usr/bin/python ]
+        then
+            printf "%s\n" "   ${yel:?}Installing required rpms..${end:?}"
+            sudo yum clean all > /dev/null 2>&1
+            sudo yum install -y -q -e 0 "$rhel7_packages" "$yum_packages"> /dev/null 2>&1
+        fi
+    fi
+
+    ## Install on RHEL8 and fedora
+    if [[ "A${OS_NAME-}" == "AFedora" ]] || [[ "$rhel_major" == "8" ]]
+    then
+	if [ "${pkg_is_missing}" == "yes" ]
+        then
+            printf "%s\n" "   ${blu:?}Installing required python rpms..${end:?}"
+            sudo yum clean all > /dev/null 2>&1
+            #sudo rm -r /var/cache/dnf
+            #sudo yum install -y "$yum_packages"> /dev/null 2>&1
+            #sudo yum install -y -q -e 0 "$yum_packages"> /dev/null 2>&1
+            for pkg in $yum_packages
+            do
+                if ! rpm -qa | grep -q "$pkg"
+                then
+		    sudo yum install -y "$pkg" > /dev/null 2>&1
+                fi
+            done
+        fi
+     fi
 
     ## check if python3 is installed
     if which python3> /dev/null 2>&1
@@ -1026,6 +1112,41 @@ function install_packages () {
     fi
 }
 
+qubinode_setup_ansible ()
+{
+    ## define maintenace option
+    local force_ansible
+    local ansible_msg
+    force_ansible="${qubinode_maintenance_opt:-none}"
+    if ! which ansible-galaxy >/dev/null 2>&1
+    then
+        register_system
+        install_packages
+    fi
+
+    if which ansible-galaxy >/dev/null 2>&1
+    then
+        ansible_msg="Downloading required Ansible roles and collections"
+        local result
+        local ansible_galaxy_cmd
+        result=$(ansible-galaxy role list | grep -v $project_dir | wc -l)
+        # Ensure roles are downloaded
+        if [ $result -eq 0 ]
+        then
+            printf "%s\n" "${ansible_msg}"
+	    ansible-galaxy install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
+	    nsible-galaxy collection install -r ""${ANSIBLE_REQUIREMENTS_FILE}"" > /dev/null 2>&1
+        else
+	    if [ "${force_ansible}" == "ansible" ]
+	    then
+                printf "%s\n" "${ansible_msg}"
+	        ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
+                ansible-galaxy install --force -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
+	    fi
+        fi
+    fi
+}
+
 ##---------------------------------------------------------------------
 ##  MENU OPTIONS
 ##---------------------------------------------------------------------
@@ -1038,3 +1159,52 @@ function display_help() {
     fi
     cat < "${project_dir}/docs/qubinode/qubinode-menu-options.adoc"
 }
+
+function qubinode_maintenance_options () {
+    if [ "${qubinode_maintenance_opt}" == "clean" ]
+    then
+        qubinode_project_cleanup
+    elif [ "${qubinode_maintenance_opt}" == "hwp" ]
+    then
+        # Collect hardware information
+        create_qubinode_profile_log
+    elif [ "${qubinode_maintenance_opt}" == "setup" ]
+    then
+        qubinode_baseline
+        qubinode_vars
+        qubinode_vault_file
+    elif [ "${qubinode_maintenance_opt}" == "rhsm" ]
+    then
+        ## Check system registration status
+        check_rhsm_status
+        ask_user_for_rhsm_credentials
+        register_system
+        qubinode_vars
+        qubinode_vault_file
+    elif [ "${qubinode_maintenance_opt}" == "ansible" ]
+    then
+        qubinode_setup_ansible
+    elif [ "${qubinode_maintenance_opt}" == "network" ]
+    then
+        get_primary_interface
+        qubinode_vars
+    elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
+    then
+        cd "${project_dir}"
+        ansible-playbook playbooks/kvmhost.yml
+    elif [ "${qubinode_maintenance_opt}" == "rebuild_qubinode" ]
+    then
+        rebuild_qubinode
+    elif [ "${qubinode_maintenance_opt}" == "undeploy" ]
+    then
+        #TODO: this should remove all VMs and clean up the project folder
+        qubinode_vm_manager undeploy
+    elif [ "${qubinode_maintenance_opt}" == "uninstall_openshift" ]
+    then
+      #TODO: this should remove all VMs and clean up the project folder
+        qubinode_uninstall_openshift
+    else
+        display_help
+    fi
+}
+
