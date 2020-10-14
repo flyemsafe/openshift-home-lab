@@ -31,7 +31,7 @@ If you choose **Server with GUI**, make sure from the **Add-ons for Selected Evi
 
 As a non root user.
 
-1. Download get_qubinode.sh script.
+1. Copy/paste the below command to download the get_qubinode.sh script.
 ```shell=bash
 $(export qb_url="https://raw.githubusercontent.com/flyemsafe/qubinode-installer/newinstaller/lib/get_qubinode.sh"; curl -OL "$qb_url" >/dev/null 2>&1 || wget "$qb_url" >/dev/null 2>&1; chmod +x get_qubinode.sh)
 ```
