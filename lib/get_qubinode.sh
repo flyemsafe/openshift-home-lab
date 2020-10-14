@@ -14,34 +14,26 @@ set -o pipefail         # Use last non-zero exit code in a pipeline
 PROJECT_NAME="qubinode-installer"
 PROJECT_DIR="$HOME/${PROJECT_NAME}"
 QUBINODE_URL="https://github.com/flyemsafe"
-QUBINODE_ARCHIVE_URL="${QUBINODE_ARCHIVE_URL}/${PROJECT_NAME}/archive"
-QUBINODE_ZIP_FILE="newinstaller.zip"
+QUBINODE_ZIP_URL="${QUBINODE_URL}/${PROJECT_NAME}/archive"
+QUBINODE_TAR_URL="${QUBINODE_URL}/${PROJECT_NAME}/tarball"
 QUBINODE_BRANCH="newinstaller"
-
-# Exports the qubinode installer into the home directory
-function extract_quibnode_installer(){
-    echo "${1}"
-    unzip "$HOME/${1}"
-    rm "$HOME/${1}"
-    NAMED_RELEASE=$(echo "${1}" | sed -e 's/.zip//')
-    mv "${PROJECT_NAME}-${NAMED_RELEASE}" "${PROJECT_NAME}"
-}
+QUBINODE_REMOTE_ZIP_FILE="${QUBINODE_ZIP_URL}/${QUBINODE_BRANCH}.zip"
+QUBINODE_REMOTE_TAR_FILE="${QUBINODE_TAR_URL}/${QUBINODE_BRANCH}"
 
 # downloads the qubinode code using curl 
-function curl_download(){
-    if [ -x /usr/bin/curl ] ; then
-        cd $HOME
-        curl -OL  "${QUBINODE_ARCHIVE_URL}/${QUBINODE_ZIP_FILE}"
-        extract_quibnode_installer "${QUBINODE_ZIP_FILE}"
-    fi 
+function curl_download()
+{
+    cd "${HOME}"
+    curl -LJ -o "${PROJECT_NAME}.tar.gz" "${QUBINODE_REMOTE_TAR_FILE}"
+    mkdir "${PROJECT_NAME}"
+    tar -xzf "${PROJECT_NAME}.tar.gz" -C "${PROJECT_NAME}" --strip-components=1
+    if [ -d "${PROJECT_DIR}" ]
+    then
+        rm -f "${PROJECT_NAME}.tar.gz"
+    fi
 }
 
-# starting the qubinode installer 
-function start_qubinode_install(){
-    cd "${PROJECT_DIR}/"
-    ./"${PROJECT_NAME}" -m setup
-}
-
+# Download the project using git
 function git_clone_code(){
   git clone "${QUBINODE_URL}/${PROJECT_NAME}.git"
   cd "${PROJECT_NAME}"
@@ -51,82 +43,91 @@ function git_clone_code(){
 # calling a wget to download  qubinode node code
 function wget_download(){
     cd $HOME
-    wget ${QUBINODE_ARCHIVE_URL}/${QUBINODE_ZIP_FILE}
-    extract_quibnode_installer ${QUBINODE_ZIP_FILE}
+    wget ${QUBINODE_ZIP_URL}/${QUBINODE_REMOTE_ZIP_FILE}
+    extract_quibnode_installer ${QUBINODE_REMOTE_ZIP_FILE}
+}
+
+# extracts the qubinode installer into the home directory
+function extract_quibnode_installer(){
+    echo "${1}"
+    unzip "$HOME/${1}"
+    rm "$HOME/${1}"
+    NAMED_RELEASE=$(echo "${1}" | sed -e 's/.zip//')
+    mv "${PROJECT_NAME}-${NAMED_RELEASE}" "${PROJECT_NAME}"
+}
+
+# starting the qubinode installer 
+function start_qubinode_install(){
+    start_qubinode_download
+    cd "${PROJECT_DIR}/"
+    ./"${PROJECT_NAME}" -m setup
+}
+
+# Start qubinode deployment with config
+function start_qubinode_install_with_config () 
+{
+    local config_file
+    config_file="$1"
+    
+    #if [ -f $config_file ] && [ ! -f "${PROJECT_DIR}/qubinode_vars.txt" ]
+    if [ ! -f $config_file ]
+    then
+        printf '%s\n' "$config_file does not exist"
+        exit 1
+    else
+        start_qubinode_download
+        test -d "${PROJECT_DIR}" && cp $config_file "${PROJECT_DIR}/qubinode_vars.txt"
+    fi
+
+    if [ ! -f "${PROJECT_DIR}/qubinode_vars.txt" ]
+    then
+        cd "${PROJECT_DIR}/"
+        ./"${PROJECT_NAME}" -m setup
+    else
+        printf '%s\n' "$PROJECT_DIR does not exist"
+        exit 1
+    fi
 }
 
 # start the qubinode installer check and download if does not exist
-function start_qubinode_download(){
+function start_qubinode_download()
+{
+    local unzip_found=no
+    local git_found=no
+    local wget_found=no
+    local curl_found=no
+    local download_method=""
 
-  local unzip_found=no
-  local git_found=no
-  local wget_found=no
-  local curl_found=no
-
-  ## check for the presence of unzip
-  if which unzip> /dev/null 2>&1
-  then
-      unzip_found=yes
-  fi
-
-  ## chek for git
-  if which git> /dev/null 2>&1
-  then
-      git_found=yes
-  fi
-
-  ## chek for curl
-  if which curl> /dev/null 2>&1
-  then
-      curl_found=yes
-  fi
-
-  ## chek for wget
-  if which wget> /dev/null 2>&1
-  then
-      wget_found=yes
-  fi
-
-  ## download with curl and zip
-  if [ "A${unzip_found}" == "Ayes" ] && [ "A${curl_found}" == "Ayes" ]
-  then
-      download_method=use_curl
-  fi
-
-  ## download with zip and wget
-  if [ "A${unzip_found}" == "Ayes" ] && [ "A${wget_found}" == "Ayes" ]
-  then
-      download_method=use_wget
-  fi
-
-  ## download with git
-  if [ "A${git_found}" == "Ayes" ]
-  then
-      download_method=use_git
-  fi
-
-  ## Download Qubinode Project
-  if  [ ! -d "${PROJECT_DIR}" ]
-  then
-      case "$download_method" in
-          use_curl)
-              curl_download
-	      ;;
-	  use_wget)
-              wget_download
-	      ;;
-	  use_git)
-              git_clone_code
-	      ;;
-	  *)
-              echo "Wasn't able to locate any of the following commands: wget, curl, git, zip"
-              echo "Please install either curl or wget and zip or just git to continue with install"
-              exit 1
-      esac
-
-      ## start install
-      start_qubinode_install
-  fi
+    if [ ! -d "${PROJECT_DIR}" ]
+    then 
+        ## chek for curl
+        if which curl> /dev/null 2>&1
+        then
+            curl_download
+        fi
+      
+        ## check for the presence of unzip
+        if which unzip> /dev/null 2>&1
+        then
+            unzip_found=yes
+        fi
+      
+        ## chek for git
+        if which git> /dev/null 2>&1
+        then
+            git_clone_code
+        fi
+      
+        ## chek for wget
+        if which wget> /dev/null 2>&1
+        then
+            wget_download
+        fi
+    else
+        printf '%s\n' "The Qubinode project directory ${PROJECT_DIR} already exists."
+        printf '%s\n' "Run ${PROJECT_DIR}/qubinode-installer -h to see additional options"
+        exit 1
+    fi
 }
 
 # Remove qubinode installer and conpoments
@@ -151,66 +152,79 @@ function remove_qubinode_folder(){
 
 }
 
+
 # displays usage
 function script_usage() {
     cat << EOF
 Usage:
      -h|--help                  Displays this help
      -v|--verbose               Displays verbose output
-    -i|--install              Install Qubinode installer 
-    -d|--delete                 Remove Qubinode installer 
+     -c|--config                Install Qubinode installer using config file
+     -d|--delete                Remove Qubinode installer 
 EOF
 }
 
-# Parsing menu items 
-function parse_params() {
-    local param
-    while [[ $# -gt 0 ]]; do
-        param="$1"
-        shift
-        case $param in
-            -h | --help)
+## returns zero/true if root user
+function is_root () {
+    return $(id -u)
+}
+
+function arg_error ()
+{
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+
+function main ()
+{
+    local config_file
+    local user_input
+    local args
+    args=${1-default}
+    
+    # Exit if this is executed as the root user
+    if is_root 
+    then
+        echo "Error: qubi-installer should be run as a normal user, not as root!"
+        exit 1
+    fi
+
+    while :; do
+        case "$args" in
+            -h|-\?|--help)
                 script_usage
-                exit 0
+                exit
                 ;;
-            -v | --verbose)
-                verbose=true
+            -c|--config)
+                user_input=${2-default}
+                if [ "$user_input" ]
+                then
+                    config_file="$user_input"
+                    shift
+                else 
+                    arg_error 'ERROR: "--config" requires a configuration file.'
+                fi
+                start_qubinode_install_with_config "$config_file"
                 ;;
-            -i | --install)
-                start_qubinode_download
-                ;;
-            -d | --delete)
+            -d|--delete)
                 remove_qubinode_folder
                 ;;
-            *)
-                echo  "Invalid parameter was provided: $param" 
-                script_usage
-                exit 1
+            --)
+                shift
+                break
                 ;;
+            -?*)
+                printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2
+                ;;
+            *)
+                start_qubinode_download
         esac
+        shift
     done
-    shift "$((OPTIND-1))"
 }
 
 
-# DESC: Main control flow
-# ARGS: $@ (optional): Arguments provided to the script
-# OUTS: None
-function main() {
-    parse_params "$@"
-}
+main "$@"
 
-# Start main function 
-#if [ -z $@ ];
-if (( "$OPTIND" == 1 ))
-then 
-    start_qubinode_download
-elif [ ! -z $@ ]
-then
-    main "$@"
-else
-    echo "Please see script usage."
-    script_usage
-fi 
 
 
