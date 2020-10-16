@@ -20,51 +20,15 @@ QUBINODE_BRANCH="newinstaller"
 QUBINODE_REMOTE_ZIP_FILE="${QUBINODE_ZIP_URL}/${QUBINODE_BRANCH}.zip"
 QUBINODE_REMOTE_TAR_FILE="${QUBINODE_TAR_URL}/${QUBINODE_BRANCH}"
 
-# downloads the qubinode code using curl 
-function curl_download()
-{
-    cd "${HOME}"
-    curl -LJ -o "${PROJECT_NAME}.tar.gz" "${QUBINODE_REMOTE_TAR_FILE}"
-    mkdir "${PROJECT_NAME}"
-    tar -xzf "${PROJECT_NAME}.tar.gz" -C "${PROJECT_NAME}" --strip-components=1
-    if [ -d "${PROJECT_DIR}" ]
-    then
-        rm -f "${PROJECT_NAME}.tar.gz"
-    fi
-}
-
-# Download the project using git
-function git_clone_code(){
-  git clone "${QUBINODE_URL}/${PROJECT_NAME}.git"
-  cd "${PROJECT_NAME}"
-  git checkout "${QUBINODE_BRANCH}"
-}
-
-# calling a wget to download  qubinode node code
-function wget_download(){
-    cd $HOME
-    wget ${QUBINODE_ZIP_URL}/${QUBINODE_REMOTE_ZIP_FILE}
-    extract_quibnode_installer ${QUBINODE_REMOTE_ZIP_FILE}
-}
-
-# extracts the qubinode installer into the home directory
-function extract_quibnode_installer(){
-    echo "${1}"
-    unzip "$HOME/${1}"
-    rm "$HOME/${1}"
-    NAMED_RELEASE=$(echo "${1}" | sed -e 's/.zip//')
-    mv "${PROJECT_NAME}-${NAMED_RELEASE}" "${PROJECT_NAME}"
-}
-
 # starting the qubinode installer 
-function start_qubinode_install(){
-    start_qubinode_download
+function setup_qubinode(){
+    download_qubinode_project
     cd "${PROJECT_DIR}/"
     ./"${PROJECT_NAME}" -m setup
 }
 
 # Start qubinode deployment with config
-function start_qubinode_install_with_config () 
+function setup_qubinode_with_config () 
 {
     local config_file
     config_file="$1"
@@ -75,7 +39,7 @@ function start_qubinode_install_with_config ()
         printf '%s\n' "$config_file does not exist"
         exit 1
     else
-        start_qubinode_download
+        download_qubinode_project
         test -d "${PROJECT_DIR}" && cp $config_file "${PROJECT_DIR}/qubinode_vars.txt"
     fi
 
@@ -90,38 +54,52 @@ function start_qubinode_install_with_config ()
 }
 
 # start the qubinode installer check and download if does not exist
-function start_qubinode_download()
+function download_qubinode_project()
 {
-    local unzip_found=no
-    local git_found=no
-    local wget_found=no
-    local curl_found=no
-    local download_method=""
+    local util_cmds="wget curl unzip tar"
 
     if [ ! -d "${PROJECT_DIR}" ]
-    then 
-        ## chek for curl
-        if which curl> /dev/null 2>&1
+    then
+        if which curl> /dev/null 2>&1 && which tar> /dev/null 2>&1
         then
-            curl_download
-        fi
-      
-        ## check for the presence of unzip
-        if which unzip> /dev/null 2>&1
+            cd "${HOME}"
+            curl -LJ -o "${PROJECT_NAME}.tar.gz" "${QUBINODE_REMOTE_TAR_FILE}"
+            mkdir "${PROJECT_NAME}"
+            tar -xzf "${PROJECT_NAME}.tar.gz" -C "${PROJECT_NAME}" --strip-components=1
+	    rm -f "${PROJECT_NAME}.tar.gz" 
+        elif which curl> /dev/null 2>&1 && which unzip> /dev/null 2>&1
         then
-            unzip_found=yes
-        fi
-      
-        ## chek for git
-        if which git> /dev/null 2>&1
+            cd "${HOME}"
+            curl -LJ -o "${QUBINODE_BRANCH}.zip" "${QUBINODE_REMOTE_ZIP_FILE}"
+            unzip "${QUBINODE_BRANCH}.zip"
+            rm "${QUBINODE_BRANCH}.zip"
+            mv "${PROJECT_NAME}-${QUBINODE_BRANCH}" "${PROJECT_NAME}"
+        elif which wget> /dev/null 2>&1 && which tar> /dev/null 2>&1
         then
-            git_clone_code
-        fi
-      
-        ## chek for wget
-        if which wget> /dev/null 2>&1
+            cd "${HOME}"
+            wget "${QUBINODE_REMOTE_TAR_FILE}" -O "${PROJECT_NAME}.tar.gz"
+            mkdir "${PROJECT_NAME}"
+            tar -xzf "${PROJECT_NAME}.tar.gz" -C "${PROJECT_NAME}" --strip-components=1
+	    rm -f "${PROJECT_NAME}.tar.gz"
+        elif which wget> /dev/null 2>&1 && which unzip> /dev/null 2>&1
         then
-            wget_download
+            cd "${HOME}"
+            wget "${QUBINODE_REMOTE_ZIP_FILE}"
+            unzip "${QUBINODE_BRANCH}.zip"
+            rm "${QUBINODE_BRANCH}.zip"
+            mv "${PROJECT_NAME}-${QUBINODE_BRANCH}" "${PROJECT_NAME}"
+        else
+            local count=0
+            for util in $util_cmds
+            do
+                if ! which $util> /dev/null 2>&1
+                then
+                    missing_cmd[count]="$util"
+                    count=$((count+1))
+                fi
+            done
+            printf '%s\n' "Error: could not find the following ${#missing_cmd[@]} utilies: ${missing_cmd[*]}"
+            exit 1
         fi
     else
         printf '%s\n' "The Qubinode project directory ${PROJECT_DIR} already exists."
@@ -188,8 +166,9 @@ function main ()
         echo "Error: qubi-installer should be run as a normal user, not as root!"
         exit 1
     fi
-
-    while :; do
+    
+    while true
+    do
         case "$args" in
             -h|-\?|--help)
                 script_usage
@@ -204,10 +183,16 @@ function main ()
                 else 
                     arg_error 'ERROR: "--config" requires a configuration file.'
                 fi
-                start_qubinode_install_with_config "$config_file"
+                setup_qubinode_with_config "$config_file"
+		break
                 ;;
-            -d|--delete)
+            -d|--download)
+		download_qubinode_project
+		break
+                ;;
+            -r|--remove)
                 remove_qubinode_folder
+		break
                 ;;
             --)
                 shift
@@ -217,7 +202,8 @@ function main ()
                 printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2
                 ;;
             *)
-                start_qubinode_download
+               setup_qubinode
+	       break
         esac
         shift
     done

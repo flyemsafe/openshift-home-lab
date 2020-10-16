@@ -140,7 +140,6 @@ function qubinode_baseline () {
 
 ## this function generates the required vars file
 function qubinode_vars () {
-    echo "Generating vars"
     ## Generate bash variables file
     TMP_BASH_VARS_FILE=$(mktemp)
     CURRENT_BASH_VARS_FILE=$(mktemp)

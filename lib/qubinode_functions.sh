@@ -344,8 +344,12 @@ function pre_os_check () {
 	fi
     fi
 
-    ## set rhsm system var
+    ## setup vars for export
     rhsm_system="$RHSM_SYSTEM"
+    export RHEL_RELEASE="$rhel_release"
+    export RHEL_MAJOR="$rhel_major"
+    export OS_NAME="$os_name"
+    export RHSM_SYSTEM="$RHSM_SYSTEM"
 }
 
 	    
@@ -1018,101 +1022,75 @@ function deploy_new_idm ()
 ##---------------------------------------------------------------------
 ## YUM, PIP packages and Ansible roles, collections
 ##---------------------------------------------------------------------
-function install_packages () {
-    ## default vars
-    _rhel7_packages="python python3-pip python2-pip python-dns"
-    _rhel8_repos="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
-    _yum_packages="python3-lxml python3-libvirt python3-netaddr ipcalc python3-pyyaml python3 python3-pip python3-dns ansible git podman python-podman-api toolbox python3-netaddr"
-    rhel8_repos="${RHEL8_REPOS:-$_rhel8_repos}"
-    pip_packages="${PIP_PACKAGES:-yml2json}"
-    rhel7_packages="${RHEL7_PACKAGES:-$_rhel7_packages}"
-    yum_packages="${YUM_PACKAGES:-$_yum_packages}"
 
+function install_packages () {
+    ## set local vars from environment variables
+    local rhsm_system="$RHSM_SYSTEM"
+    local rhel_release="$RHEL_RELEASE"
+    local rhel_major="$RHEL_MAJOR"
+    local os_name="$OS_NAME"
+    local python3_installed="$PYTHON3_INSTALLED"
+    local ansible_installed="$ANSIBLE_INSTALLED"
+    local python_packages="python3-lxml python3-libvirt python3-netaddr python3-pyyaml python3 python3-pip python3-dns python-podman-api"
+    local tools_packages="ipcalc toolbox"
+    local ansible_packages="ansible git"
+    local podman_packages="podman python-podman-api"
+    local all_rpm_packages="$podman_packages $ansible_packages $tools_packages $python_packages"
+    local yum_packages="${YUM_PACKAGES:-$all_rpm_packages}"
+    local _rhel8_repos="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
+    local pip_packages="${PIP_PACKAGES:-yml2json}"
+    local rhel8_repos="${RHEL8_REPOS:-$_rhel8_repos}"
+    local yum_packages="${YUM_PACKAGES:-$yum_packages}"
+
+    printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+    printf "%s\n\n" "  ${blu:?}Ensure required packages are installed${end:?}"
     # check if packages needs to be installed
-    pkg_is_missing=no
     for pkg in $yum_packages
     do
-        if ! rpm -qa | grep -q "$pkg"
+        if ! rpm -q "$pkg" > /dev/null 2>&1
         then
-           pkg_is_missing=yes
-           break
+            printf "%s\n\n" "  Installing $pkg"
+            sudo yum install -y "$pkg" > /dev/null 2>&1
+        else
+            printf "%s\n\n" "  Package "$pkg" is installed"
         fi
     done
 
-    # install python
-    if [ "A${PYTHON3_INSTALLED-}" == "Ano" ] && [ "A${ANSIBLE_INSTALLED-}" == "Ano" ]
+    ## ensure python3 is installed
+    #if [ "A${python3_installed}" == "Ano" ] && [ "A${ansible_installed}" == "Ano" ]
+    if [ "A${python3_installed}" ]
     then
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n\n" "  ${blu:?}Install Packages${end:?}"
-        if [[ $rhel_major == "8" ]]
-        then
-	    ENABLED_REPOS=$(mktemp)
-	    # shellcheck disable=SC2024
-	    sudo subscription-manager repos --list-enabled > "${ENABLED_REPOS}"
-	    for repo in $rhel8_repos
-	    do
-                if ! grep -q "$repo" "${ENABLED_REPOS}"
-		then
-	            # shellcheck disable=SC2024
-                    sudo subscription-manager repos --enable="${repo}" > /dev/null 2>&1
-                fi
-            done
-	fi
+        printf "%s\n\n" "  ${blu:?}Install python3${end:?}"
+        sudo yum install -y "$python_packages" > /dev/null 2>&1 && PYTHON3_INSTALLED=yes || PYTHON3_INSTALLED=no
     fi
 
-    ## RHEL7
-    if [[ $rhel_major == "7" ]]
+    ## ensure ansible is installed
+    if [ "A${ansible_installed}" == "Ano" ]
     then
-        if [ ! -f /usr/bin/python ]
-        then
-            printf "%s\n" "   ${yel:?}Installing required rpms..${end:?}"
-            sudo yum clean all > /dev/null 2>&1
-            sudo yum install -y -q -e 0 "$rhel7_packages" "$yum_packages"> /dev/null 2>&1
-        fi
+        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+        printf "%s\n\n" "  ${blu:?}Install ansible${end:?}"
+        sudo yum install -y "$ansible_packages" > /dev/null 2>&1 && ANSIBLE_INSTALLED=yes || ANSIBLE_INSTALLED=no
     fi
 
-    ## Install on RHEL8 and fedora
-    if [[ "A${OS_NAME-}" == "AFedora" ]] || [[ "$rhel_major" == "8" ]]
-    then
-	if [ "${pkg_is_missing}" == "yes" ]
-        then
-            printf "%s\n" "   ${blu:?}Installing required python rpms..${end:?}"
-            sudo yum clean all > /dev/null 2>&1
-            #sudo rm -r /var/cache/dnf
-            #sudo yum install -y "$yum_packages"> /dev/null 2>&1
-            #sudo yum install -y -q -e 0 "$yum_packages"> /dev/null 2>&1
-            for pkg in $yum_packages
-            do
-                if ! rpm -qa | grep -q "$pkg"
-                then
-		    sudo yum install -y "$pkg" > /dev/null 2>&1
-                fi
-            done
-        fi
-     fi
-
-    ## check if python3 is installed
-    if which python3> /dev/null 2>&1
-    then
-        PYTHON3_INSTALLED=yes
-    else
-        PYTHON3_INSTALLED=no
-    fi
 
     ## install pip3 packages
     if which /usr/bin/pip3 > /dev/null 2>&1
     then
-	for pkg in $pip_packages
-	do
-	    if ! pip3 list --format=legacy| grep "$pkg" > /dev/null 2>&1
+        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+        printf "%s\n\n" "  ${blu:?}Install pip3 packages${end:?}"
+        for pkg in $pip_packages
+        do
+            if ! pip3 list --format=legacy| grep "$pkg" > /dev/null 2>&1
             then
                 /usr/bin/pip3 install "$pkg" --user
-	    fi
+            fi
         done
     fi
 }
 
-qubinode_setup_ansible ()
+
+function qubinode_setup_ansible ()
 {
     ## define maintenace option
     local force_ansible
@@ -1126,24 +1104,32 @@ qubinode_setup_ansible ()
 
     if which ansible-galaxy >/dev/null 2>&1
     then
-        ansible_msg="Downloading required Ansible roles and collections"
-        local result
-        local ansible_galaxy_cmd
-        result=$(ansible-galaxy role list | grep -v $project_dir | wc -l)
-        # Ensure roles are downloaded
-        if [ $result -eq 0 ]
-        then
-            printf "%s\n" "${ansible_msg}"
-	    ansible-galaxy install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
-	    nsible-galaxy collection install -r ""${ANSIBLE_REQUIREMENTS_FILE}"" > /dev/null 2>&1
-        else
-	    if [ "${force_ansible}" == "ansible" ]
-	    then
+        printf "%s\n" "  ${blu:?}Ensure the ansible roles and collections are available${end:?}"
+        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+        if which git >/dev/null 2>&1
+	then
+            ansible_msg="Downloading required Ansible roles and collections"
+            local result
+            local ansible_galaxy_cmd
+            result=$(ansible-galaxy role list | grep -v $project_dir | wc -l)
+            # Ensure roles are downloaded
+            if [ $result -eq 0 ]
+            then
                 printf "%s\n" "${ansible_msg}"
+	        ansible-galaxy install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
 	        ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
-                ansible-galaxy install --force -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
-	    fi
-        fi
+            else
+	        if [ "${force_ansible}" == "ansible" ]
+	        then
+                    printf "%s\n" "${ansible_msg}"
+	            ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
+                    ansible-galaxy install --force -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
+	        fi
+            fi
+        else
+            printf "%s\n" "  ${red:?}Error: git is required to continue. Please install git and try again.${end:?}"
+	    exit 1
+	fi
     fi
 }
 
