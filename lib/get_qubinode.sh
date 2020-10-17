@@ -27,6 +27,7 @@ function setup_qubinode ()
 {
     download_qubinode_project
     cd "${PROJECT_DIR}/"
+    printf '%s\n\n' "Running qubinode-installer -m setup"
     ./"${PROJECT_NAME}" -m setup
 }
 
@@ -49,6 +50,7 @@ function setup_qubinode_with_config ()
     if [ -f "${QUBINODE_BASH_VARS_FILE}" ]
     then
         cd "${PROJECT_DIR}/"
+        printf '%s\n\n' "Running qubinode-installer -m setup"
         ./"${PROJECT_NAME}" -m setup
     else
         printf '%s\n' "Error: ${QUBINODE_BASH_VARS_FILE} does not exist"

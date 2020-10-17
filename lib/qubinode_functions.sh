@@ -215,6 +215,7 @@ function verify_networking () {
     libvirt_network_name="${libvirt_network_name:-default}"
     libvirt_bridge_name="${libvirt_bridge_name:-qubibr0}"
     create_libvirt_bridge="${create_libvirt_bridge:-yes}"
+    confirm_libvirt_network="${CONFIRM_LIBVIRT_NETWORK:-yes}"
 
     local libvirt_net_choices
     local libvirt_net_selections
@@ -223,39 +224,44 @@ function verify_networking () {
     IFS=" " read -r -a libvirt_net_choices <<< "$libvirt_net_selections"
     libvirt_net_msg=" Would you like to ${cyn:?}skip${end:?} or ${cyn:?}continue${end:?} the bridge network setup or ${cyn:?}specify${end:?} a libvirt network to use?"
 
-    printf "%s\n\n" ""
-    printf "%s\n" "  ${blu:?}Networking Details${end:?}"
-    printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-    printf "%s\n" "  The default libvirt network name is a nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
-    printf "%s\n" "  A bridge libvirt network is created to make it easy to access VM's running on the qubinode."
-    printf "%s\n\n" "  A bridge network is currently required Red Hat IdM server."
-    printf "%s\n" "  You can skip setting up a bridge network and use the default or specify your own."
-
-    confirm_menu_option "${libvirt_net_choices[*]}" "$libvirt_net_msg" libvirt_net_choice
-    if [ "A${libvirt_net_choice}" == "ASpecify" ]
+    if [ "${confirm_libvirt_network}" == 'yes' ]
     then
-        confirm_correct "Type the name of a existing libvirt network you would like to use" libvirt_network_name
-        create_libvirt_bridge=no
-	confirm "  Is this a bridge network? ${cyn:?}yes/no${end:?}"
-        if [ "A${response}" == "Ayes" ]
+        printf "%s\n\n" ""
+        printf "%s\n" "  ${blu:?}Networking Details${end:?}"
+        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+        printf "%s\n" "  The default libvirt network name is a nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
+        printf "%s\n" "  A bridge libvirt network is created to make it easy to access VM's running on the qubinode."
+        printf "%s\n\n" "  A bridge network makes it easy to connect from your laptop/desktop/workstation to VMs on the Qubinode."
+        printf "%s\n" "  You can skip setting up a bridge network and use the default or specify your own."
+    
+        confirm_menu_option "${libvirt_net_choices[*]}" "$libvirt_net_msg" libvirt_net_choice
+        if [ "A${libvirt_net_choice}" == "ASpecify" ]
         then
-	    libvirt_bridge_name="${libvirt_network_name}"
-	fi
-    elif [ "A${libvirt_net_choice}" == "ASkip" ]
-    then
-        create_libvirt_bridge=no
-        printf "%s\n" " Using the libvirt nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
-    else
-	verify_bridge_networking
+            confirm_correct "Type the name of a existing libvirt network you would like to use" libvirt_network_name
+            create_libvirt_bridge=no
+	        confirm "  Is this a bridge network? ${cyn:?}yes/no${end:?}"
+            if [ "A${response}" == "Ayes" ]
+            then
+	            libvirt_bridge_name="${libvirt_network_name}"
+                confirm_libvirt_network=no
+	        fi
+        elif [ "A${libvirt_net_choice}" == "ASkip" ]
+        then
+            create_libvirt_bridge=no
+            confirm_libvirt_network=no
+            printf "%s\n" "  Using the libvirt nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
+        else
+            if [ "A${create_libvirt_bridge}" == "Ayes" ]
+            then
+                verify_bridge_networking
+            fi 
+        fi
     fi
-   
 }
 
 
 function verify_bridge_networking () {
     printf "%s\n\n" "  The below networking information was discovered and will be used for creating a bridge network."
-
-    
     printf "%s\n" "  ${blu:?}NETWORK_DEVICE${end:?}=${cyn:?}${netdevice:?}${end:?}"
     printf "%s\n" "  ${blu:?}IPADDRESS${end:?}=${cyn:?}${ipaddress:?}${end:?}"
     printf "%s\n" "  ${blu:?}GATEWAY${end:?}=${cyn:?}${gateway:?}${end:?}"
@@ -431,8 +437,8 @@ function register_system () {
     if [ "A${rhsm_system}" == "Ayes" ] && [ "A${system_registered}" == "Ano" ]
     then
         printf "%s\n\n" ""
-        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         printf "%s\n" "  ${blu:?}RHSM Registration${end:?}"
+        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         rhsm_reg_result=$(mktemp)
         echo sudo subscription-manager register \
     	      "${RHSM_CMD_OPTS}" --force \
@@ -635,8 +641,8 @@ function load_vault_vars ()
 function rhsm_get_reg_method () {
     local user_response
     printf "%s\n\n" ""
+    printf "%s\n" "  ${blu:?}Red Hat Subscription Registration${end:?}"
     printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-    printf "%s\n\n" "  ${blu:?}Red Hat Subscription Registration${end:?}"
 
     printf "%s\n" "  Your credentials for access.redhat.com is needed."
     printf "%s\n" "  RHSM registration has two methods:"
@@ -740,7 +746,7 @@ function ask_for_admin_user_pass () {
     then
         printf "%s\n\n" ""
         printf "%s\n" "  Admin User Credentials"
-	printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+	    printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         printf "%s\n" "  Your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} will be used to ssh into all the VMs created."
 
         MSG_ONE="Enter a password for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
@@ -763,8 +769,8 @@ function check_additional_storage () {
     if [ "A${libvirt_dir_verify}" != "Ano" ]
     then
         printf "%s\n\n" ""
+        printf "%s\n" "  ${blu:?}Location for Libvirt directory Pool${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n\n" "  ${blu:?}Location for Libvirt directory Pool${end:?}"
         printf "%s\n" "  The current path is set to ${cyn:?}$libvirt_dir${end:?}."
         confirm "  Do you want to change it? ${blu:?}yes/no${end:?}"
         if [ "A${response}" == "Ayes" ]
@@ -783,8 +789,8 @@ function check_additional_storage () {
     if [[ "A${create_libvirt_lvm}" == "Ayes" ]] && [[ "A${libvirt_pool_disk}" == "Anone" ]]
     then
         printf "%s\n\n" ""
+        printf "%s\n" "  ${blu:?}Dedicated Storage Device For Libvirt Directory Pool${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n\n" "    ${blu:?}Dedicated Storage Device For Libvirt Directory Pool${end:?}"
         printf "%s\n" "   It is recommended to dedicate a disk to ${cyn:?}$LIBVIRT_DIR${end:?}."
         printf "%s\n" "   Qubinode uses libvirt directory pool for VM disk storage"
         printf "%s\n" ""
@@ -797,12 +803,10 @@ function check_additional_storage () {
             printf "%s\n\n" "   The following additional storage devices where found:"
 
             for disk in "${AVAILABLE_DISKS[@]}"
-            #for disk in $(echo "${AVAILABLE_DISKS[@]}")
             do
                 printf "%s\n" "     ${blu:?} * ${end:?}${blu:?}$disk${end:?}"
             done
         fi
-
 
         confirm "   Do you want to dedicate a storage device: ${blu:?}yes/no${end:?}"
         printf "%s\n" " "
@@ -812,10 +816,11 @@ function check_additional_storage () {
             confirm_menu_option "${AVAILABLE_DISKS[*]}" "$disk_msg" libvirt_pool_disk
             LIBVIRT_POOL_DISK="$libvirt_pool_disk"
             CREATE_LIBVIRT_STORAGE=yes
-	    create_libvirt_lvm="$CREATE_LIBVIRT_STORAGE"
-	else
+	        create_libvirt_lvm="$CREATE_LIBVIRT_STORAGE"
+	    else
             LIBVIRT_POOL_DISK="none"
             CREATE_LIBVIRT_STORAGE=no
+            create_libvirt_lvm="$CREATE_LIBVIRT_STORAGE"
         fi
     fi
 }
@@ -855,8 +860,8 @@ function ask_about_domain()
     if [ "A${confirmed_user_domain}" == "Ayes" ]
     then
         printf "%s\n\n" ""
+        printf "%s\n" "  ${blu:?}DNS Domain${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n\n" "  ${blu:?}DNS Domain${end:?}"
 
         if [[ "A${idm_deploy_method}" == "Ayes" ]]
         then
@@ -957,8 +962,9 @@ function ask_about_idm ()
     ## Should IdM be deployed
     if [ "A${deploy_idm}" == "Ayes" ] && [ "A${idm_deploy_method}" == "Anone" ]
     then
+        printf "%s\n" ""
+        printf "%s\n" "  ${blu:?}Red Hat Identity Manager (IdM)${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n\n" "  ${blu:?}Red Hat Identity Manager (IdM)${end:?}"
 
 	if [ "A${idm_deploy_method}" == "Anone" ]
 	then
@@ -1031,7 +1037,7 @@ function install_packages () {
     local os_name="$OS_NAME"
     local python3_installed="$PYTHON3_INSTALLED"
     local ansible_installed="$ANSIBLE_INSTALLED"
-    local python_packages="python3-lxml python3-libvirt python3-netaddr python3-pyyaml python3 python3-pip python3-dns python-podman-api"
+    local python_packages="python3-lxml python3-libvirt python3-netaddr python3-pyyaml python36 python3-pip python3-dns python-podman-api"
     local tools_packages="ipcalc toolbox"
     local ansible_packages="ansible git"
     local podman_packages="podman python-podman-api"
@@ -1042,34 +1048,36 @@ function install_packages () {
     local rhel8_repos="${RHEL8_REPOS:-$_rhel8_repos}"
     local yum_packages="${YUM_PACKAGES:-$yum_packages}"
 
+    printf "%s\n" ""
+    printf "%s\n" "  ${blu:?}Ensure required packages are installed${end:?}"
     printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-    printf "%s\n\n" "  ${blu:?}Ensure required packages are installed${end:?}"
     # check if packages needs to be installed
     for pkg in $yum_packages
     do
         if ! rpm -q "$pkg" > /dev/null 2>&1
         then
-            printf "%s\n\n" "  Installing $pkg"
+            printf "%s\n\n" "  ${cyn:?}Installing $pkg${end:?}"
             sudo yum install -y "$pkg" > /dev/null 2>&1
         else
-            printf "%s\n\n" "  Package "$pkg" is installed"
+            printf "%s\n\n" "  ${yel:?}Package "$pkg" is installed${end:?}"
         fi
     done
 
-    ## ensure python3 is installed
-    #if [ "A${python3_installed}" == "Ano" ] && [ "A${ansible_installed}" == "Ano" ]
-    if [ "A${python3_installed}" ]
+
+    if [ "A${python3_installed}" == "A" ]
     then
+        printf "%s\n" ""
+        printf "%s\n" "  ${blu:?}Installing python3${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n\n" "  ${blu:?}Install python3${end:?}"
         sudo yum install -y "$python_packages" > /dev/null 2>&1 && PYTHON3_INSTALLED=yes || PYTHON3_INSTALLED=no
     fi
 
     ## ensure ansible is installed
     if [ "A${ansible_installed}" == "Ano" ]
     then
+        printf "%s\n" ""
+        printf "%s\n" "  ${blu:?}Install ansible${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n\n" "  ${blu:?}Install ansible${end:?}"
         sudo yum install -y "$ansible_packages" > /dev/null 2>&1 && ANSIBLE_INSTALLED=yes || ANSIBLE_INSTALLED=no
     fi
 
@@ -1077,15 +1085,17 @@ function install_packages () {
     ## install pip3 packages
     if which /usr/bin/pip3 > /dev/null 2>&1
     then
+        printf "%s\n" "  ${blu:?}Ensure required pip packages are present${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n\n" "  ${blu:?}Install pip3 packages${end:?}"
         for pkg in $pip_packages
         do
             if ! pip3 list --format=legacy| grep "$pkg" > /dev/null 2>&1
             then
-                /usr/bin/pip3 install "$pkg" --user
+                printf "%s\n" "  ${cyn:?}Installing $pkg${end:?}"
+                /usr/bin/pip3 install "$pkg" --user > /dev/null 2>&1
             fi
         done
+        printf "%s\n" "  ${cyn:?}All pip packages are present${end:?}"
     fi
 }
 
@@ -1104,10 +1114,11 @@ function qubinode_setup_ansible ()
 
     if which ansible-galaxy >/dev/null 2>&1
     then
+        printf "%s\n" ""
         printf "%s\n" "  ${blu:?}Ensure the ansible roles and collections are available${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         if which git >/dev/null 2>&1
-	then
+	    then
             ansible_msg="Downloading required Ansible roles and collections"
             local result
             local ansible_galaxy_cmd
@@ -1115,21 +1126,23 @@ function qubinode_setup_ansible ()
             # Ensure roles are downloaded
             if [ $result -eq 0 ]
             then
-                printf "%s\n" "${ansible_msg}"
-	        ansible-galaxy install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
-	        ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
-            else
-	        if [ "${force_ansible}" == "ansible" ]
-	        then
-                    printf "%s\n" "${ansible_msg}"
+                printf "%s\n" "  ${ansible_msg}"
+	            ansible-galaxy install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
 	            ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
+            else
+	            if [ "${force_ansible}" == "ansible" ]
+	            then
+                    printf "%s\n" "  ${ansible_msg}"
+	                ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
                     ansible-galaxy install --force -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
-	        fi
+	            fi
             fi
+            printf "%s\n" "  ${yel:?}All ansible roles and collectiones are present${end:?}"
+            printf "%s\n" ""
         else
             printf "%s\n" "  ${red:?}Error: git is required to continue. Please install git and try again.${end:?}"
-	    exit 1
-	fi
+	        exit 1
+	    fi
     fi
 }
 
@@ -1156,6 +1169,7 @@ function qubinode_maintenance_options () {
         create_qubinode_profile_log
     elif [ "${qubinode_maintenance_opt}" == "setup" ]
     then
+        printf "%s\n" "  ${blu:?}Running Qubinode Setup${end:?}"
         qubinode_baseline
         qubinode_vars
         qubinode_vault_file
