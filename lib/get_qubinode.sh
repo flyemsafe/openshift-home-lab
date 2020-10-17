@@ -35,7 +35,17 @@ function setup_qubinode_with_config ()
 {
     download_qubinode_project
     test -d "${PROJECT_DIR}"
-    
+
+    if [ "A${qubinode_vault_file}" != "A" ]
+    then
+        cp "${qubinode_vault_file}" "${QUBINODE_VAULT_FILE}"
+    fi
+
+    if [ "A${qubinode_config_file}" != "A" ]
+    then
+        cp "${qubinode_config_file}" "${QUBINODE_BASH_VARS_FILE}"
+    fi
+
     if [ -f "${QUBINODE_BASH_VARS_FILE}" ]
     then
         cd "${PROJECT_DIR}/"
@@ -204,8 +214,6 @@ function main ()
         then
             printf '%s\n' "Error: ${qubinode_config_file} does not exist"
             exit 1
-        else
-            cp "${qubinode_config_file}" "${QUBINODE_BASH_VARS_FILE}"
         fi
 
         ## verify vault file exist
@@ -213,8 +221,6 @@ function main ()
         then
             printf '%s\n' "Error: ${qubinode_vault_file} does not exist"
             exit 1
-        else
-            cp "${qubinode_vault_file}" "${QUBINODE_VAULT_FILE}"
         fi
 
         # download and setup
