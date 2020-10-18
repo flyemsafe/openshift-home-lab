@@ -37,7 +37,7 @@ function setup_sudoers ()
        printf "%s\n" ""
        SUDOERS_TMP=$(mktemp)
        echo "${QUBINODE_ADMIN_USER} ALL=(ALL) NOPASSWD:ALL" > "${SUDOERS_TMP}"
-       echo "$__admin_pass" | sudo -S test -f "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
+       #echo "$__admin_pass" | sudo -S test -f "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
        echo "$__admin_pass" | sudo -S cp "${SUDOERS_TMP}" "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
        echo "$__admin_pass" | sudo -S chmod 0440 "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
    fi
@@ -394,8 +394,8 @@ function verify_rhsm_status () {
    status_result=$(mktemp)
    # shellcheck disable=SC2024
    sudo subscription-manager status > "${status_result}" 2>&1
-   #sub_status=$(awk -F: '/Overall Status:/ {print $2}' "${status_result}"|sed 's/^ *//g')
-   if [ "A${status}" != "ACurrent" ]
+   sub_status=$(awk -F: '/Overall Status:/ {print $2}' "${status_result}"|sed 's/^ *//g')
+   if [ "A${sub_status}" != "ACurrent" ]
    then
        sudo subscription-manager refresh > /dev/null 2>&1
        sudo subscription-manager attach --auto > /dev/null 2>&1
