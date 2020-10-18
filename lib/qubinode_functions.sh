@@ -1061,7 +1061,7 @@ function install_packages () {
         then
             printf "%s\n\n" "  ${cyn:?}Enabling repo $repo${end:?}"
             sudo subscription-manager repos --enable="$repo" ||\
-            printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}" && exit 1
+            printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}" && exit 0
         else
             printf "%s\n\n" "  ${yel:?}Yum repo "$repo" is enabled${end:?}"
         fi
@@ -1076,7 +1076,7 @@ function install_packages () {
         if ! rpm -q "$pkg" > /dev/null 2>&1
         then
             printf "%s\n\n" "  ${cyn:?}Installing $pkg${end:?}"
-            sudo yum install -y "$pkg" > /dev/null 2>&1 || printf "%s\n" "  ${red:?}Failed to install "$pkg"${end:?}" && exit 1
+            sudo yum install -y "$pkg" > /dev/null 2>&1 || printf "%s\n" "  ${red:?}Failed to install "$pkg"${end:?}" && exit 0
         else
             printf "%s\n\n" "  ${yel:?}Package "$pkg" is installed${end:?}"
         fi
