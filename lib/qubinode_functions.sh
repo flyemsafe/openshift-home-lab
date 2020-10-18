@@ -1049,6 +1049,25 @@ function install_packages () {
     local yum_packages="${YUM_PACKAGES:-$yum_packages}"
 
     printf "%s\n" ""
+    printf "%s\n" "  ${blu:?}Ensure required yum repos are enabled${end:?}"
+    printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+    # check if packages needs to be installed
+    local enabled_repos
+    enabled_repos=$(mktemp)
+    sudo subscription-manager repos --list-enabled | awk '/Repo ID:/ {print $3}' > "$enabled_repos"
+    for repo in $rhel8_repos
+    do
+        if ! grep -q $repo "$enabled_repos"
+        then
+            printf "%s\n\n" "  ${cyn:?}Enabling repo $repo${end:?}"
+            sudo subscription-manager repos --enable="$repo" ||\
+            printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}" && exit 1
+        else
+            printf "%s\n\n" "  ${yel:?}Yum repo "$repo" is enabled${end:?}"
+        fi
+    done
+
+    printf "%s\n" ""
     printf "%s\n" "  ${blu:?}Ensure required packages are installed${end:?}"
     printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
     # check if packages needs to be installed
@@ -1057,7 +1076,7 @@ function install_packages () {
         if ! rpm -q "$pkg" > /dev/null 2>&1
         then
             printf "%s\n\n" "  ${cyn:?}Installing $pkg${end:?}"
-            sudo yum install -y "$pkg" > /dev/null 2>&1
+            sudo yum install -y "$pkg" > /dev/null 2>&1 || printf "%s\n" "  ${red:?}Failed to install "$pkg"${end:?}" && exit 1
         else
             printf "%s\n\n" "  ${yel:?}Package "$pkg" is installed${end:?}"
         fi
