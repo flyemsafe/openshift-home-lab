@@ -32,7 +32,7 @@ function setup_sudoers ()
        printf "%s\n" ""
        printf "%s\n" "  ${blu:?}Setup Sudoers${end:?}"
        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-       printf "%s\n" "  The qubinode-installer runs as a normal user. It sets up your username {QUBINODE_ADMIN_USER}"
+       printf "%s\n" "  The qubinode-installer runs as a normal user. It sets up your username ${QUBINODE_ADMIN_USER}"
        printf "%s\n" "  for passwordless sudo."
        printf "%s\n" ""
        SUDOERS_TMP=$(mktemp)
@@ -1095,7 +1095,7 @@ function install_packages () {
                 /usr/bin/pip3 install "$pkg" --user > /dev/null 2>&1
             fi
         done
-        printf "%s\n" "  ${cyn:?}All pip packages are present${end:?}"
+        printf "%s\n" "  ${yel:?}All pip packages are present${end:?}"
     fi
 }
 
@@ -1190,12 +1190,18 @@ function qubinode_maintenance_options () {
         qubinode_vars
     elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
     then
+        local kvmhost_vars=playbooks/vars/kvm_host.yml
+        local inventory=inventory/hosts
         cd "${project_dir}"
-	if [ ! -f playbooks/vars/kvm_host.yml ]
-	then
-	    cp samples/kvm_host.yml playbooks/vars/kvm_host.yml
-	fi
-        ansible-playbook playbooks/kvmhost.yml
+        test -f "${kvmhost_vars}" || cp samples/kvm_host.yml "${kvmhost_vars}"
+        test -f "${inventory}" || cp samples/hosts "${inventory}"
+        if [ -f "${inventory}" ] && [ -f "${kvmhost_vars}" ]
+        then
+            printf "%s\n" "  ${blu:?}Running Qubinode KVMHOST setup${end:?}"
+            ansible-playbook playbooks/kvmhost.yml
+        else
+            printf "%s\n" "  Error: ${red:?}Could locate ${kvmhost_vars} and ${inventory} ${end:?}"
+        fi
     elif [ "${qubinode_maintenance_opt}" == "rebuild_qubinode" ]
     then
         rebuild_qubinode
