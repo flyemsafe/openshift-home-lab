@@ -1060,8 +1060,11 @@ function install_packages () {
         if ! grep -q $repo "$enabled_repos"
         then
             printf "%s\n\n" "  ${cyn:?}Enabling repo $repo${end:?}"
-            sudo subscription-manager repos --enable="$repo" ||\
-            printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}" && exit 0
+            if ! sudo subscription-manager repos --enable="$repo" > /dev/null 2>&1
+	    then
+                printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}"
+		exit 1
+	    fi
         else
             printf "%s\n\n" "  ${yel:?}Yum repo "$repo" is enabled${end:?}"
         fi
@@ -1076,7 +1079,11 @@ function install_packages () {
         if ! rpm -q "$pkg" > /dev/null 2>&1
         then
             printf "%s\n\n" "  ${cyn:?}Installing $pkg${end:?}"
-            sudo yum install -y "$pkg" > /dev/null 2>&1 || printf "%s\n" "  ${red:?}Failed to install "$pkg"${end:?}" && exit 0
+            if ! sudo yum install -y "$pkg" > /dev/null 2>&1 
+	    then
+	        printf "%s\n" "  ${red:?}Failed to install "$pkg"${end:?}"
+		exit 1
+	    fi
         else
             printf "%s\n\n" "  ${yel:?}Package "$pkg" is installed${end:?}"
         fi
@@ -1086,9 +1093,16 @@ function install_packages () {
     if [ "A${python3_installed}" == "A" ]
     then
         printf "%s\n" ""
-        printf "%s\n" "  ${blu:?}Installing python3${end:?}"
+        printf "%s\n" "  ${blu:?}Installing python36${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        sudo yum install -y "$python_packages" > /dev/null 2>&1 && PYTHON3_INSTALLED=yes || PYTHON3_INSTALLED=no
+        if ! sudo yum install -y "$python_packages" > /dev/null 2>&1 
+	then
+	    printf "%s\n" "  ${red:?}Failed to install python36${end:?}"
+	    exit 1
+	else
+            PYTHON3_INSTALLED=yes
+	    PYTHON3_INSTALLED=no
+	fi
     fi
 
     ## ensure ansible is installed
@@ -1097,7 +1111,14 @@ function install_packages () {
         printf "%s\n" ""
         printf "%s\n" "  ${blu:?}Install ansible${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        sudo yum install -y "$ansible_packages" > /dev/null 2>&1 && ANSIBLE_INSTALLED=yes || ANSIBLE_INSTALLED=no
+        if ! sudo yum install -y "$ansible_packages" > /dev/null 2>&1 
+	then
+	    printf "%s\n" "  ${red:?}Failed to ansible packages${end:?}"
+	    exit 1
+	else
+	    ANSIBLE_INSTALLED=yes
+	    ANSIBLE_INSTALLED=no
+	fi
     fi
 
 
@@ -1111,7 +1132,11 @@ function install_packages () {
             if ! pip3 list --format=legacy| grep "$pkg" > /dev/null 2>&1
             then
                 printf "%s\n" "  ${cyn:?}Installing $pkg${end:?}"
-                /usr/bin/pip3 install "$pkg" --user > /dev/null 2>&1
+                if ! /usr/bin/pip3 install "$pkg" --user > /dev/null 2>&1
+		then
+	            printf "%s\n" "  ${red:?}Failed to $pkg ${end:?}"
+		    exit 1
+		fi
             fi
         done
         printf "%s\n" "  ${yel:?}All pip packages are present${end:?}"
