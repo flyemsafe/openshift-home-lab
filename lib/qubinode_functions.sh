@@ -1176,8 +1176,8 @@ function qubinode_setup_ansible ()
             else
 	            if [ "${force_ansible}" == "ansible" ]
 	            then
-                    printf "%s\n" "  ${ansible_msg}"
-	                ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
+                    printf "%s\n" "  Force ${ansible_msg}"
+	            ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
                     ansible-galaxy install --force -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
 	            fi
             fi
@@ -1236,13 +1236,24 @@ function qubinode_maintenance_options () {
     then
         local kvmhost_vars=playbooks/vars/kvm_host.yml
         local inventory=inventory/hosts
+	local options="${product_options[@]:-none}"
+	local ansible_cmd
+	local tags=$(echo "$options" | sed 's/ /,/g' )
         cd "${project_dir}"
         test -f "${kvmhost_vars}" || cp samples/kvm_host.yml "${kvmhost_vars}"
         test -f "${inventory}" || cp samples/hosts "${inventory}"
-        if [ -f "${inventory}" ] && [ -f "${kvmhost_vars}" ]
+
+        if [ "${options}" != "none" ]
+        then
+	    ansible_cmd="ansible-playbook playbooks/kvmhost.yml --tags $tags"
+	else
+	    ansible_cmd="ansible-playbook playbooks/kvmhost.yml"
+	fi
+
+	if [ -f "${inventory}" ] && [ -f "${kvmhost_vars}" ]
         then
             printf "%s\n" "  ${blu:?}Running Qubinode KVMHOST setup${end:?}"
-            ansible-playbook playbooks/kvmhost.yml
+	    echo "${ansible_cmd}"|sh
         else
             printf "%s\n" "  Error: ${red:?}Could locate ${kvmhost_vars} and ${inventory} ${end:?}"
         fi
@@ -1261,4 +1272,3 @@ function qubinode_maintenance_options () {
         display_help
     fi
 }
-
