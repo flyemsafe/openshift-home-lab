@@ -6,9 +6,6 @@
     - vars/qubinode_vars.yml
     - vars/kvm_host.yml
 
-  tasks:
-    - name: running KVM host setup
-      include_role:
-         name: qubinode_kvmhost_setup
-
+  roles:
+    - role: qubinode_kvmhost_setup
 

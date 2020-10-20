@@ -235,50 +235,50 @@ function main ()
     do
         case $opt in
             a) 
-	        check_args;
+	            check_args;
                 full_deploy=true
                 product_options+=("$OPTARG")
                 ;;
             c) 
-	       check_args
+	           check_args
                check=true
                cluster=true
                cluster_opt=$OPTARG
                ;;
             d) 
-	       check_args;
+	           check_args;
                teardown=true
                ;;
             h) 
-	       display_help
+	           display_help
                exit 1
                ;;
             m) 
-	       check_args;
+	           check_args;
                qubinode_maintenance=true
                qubinode_maintenance_opt=$OPTARG;
                ;;
             p) 
-	       check_args
+	           check_args
                check=true
                qubinode_product=true
                qubinode_product_opt=$OPTARG
                ;;
             v) 
-	       check_args;
+	            check_args;
                _V=1
                ;;
            --) 
-	       shift; 
-	       break
-	       ;;
+	           shift; 
+	           break
+	           ;;
            -*) 
-	       echo Unrecognized flag : "$1" >&2
+	           echo Unrecognized flag : "$1" >&2
                display_help
                exit 1
                ;;
            \?) 
-	       echo Unrecognized flag : "$1" >&2
+	           echo Unrecognized flag : "$1" >&2
                display_help
                exit 1
                ;;
@@ -289,7 +289,7 @@ function main ()
     # If not arguments pass, run default option to install OpenShift
     if (( "$OPTIND" == 1 ))
     then
-	echo "$OPTIND"
+	    echo "$OPTIND"
         #display_openshift_msg_ocp4
     elif [ "A${qubinode_product}" == "Atrue" ] && [ "A${qubinode_maintenance}" == "Atrue" ]
     then
