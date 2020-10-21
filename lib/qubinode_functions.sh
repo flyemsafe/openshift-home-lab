@@ -41,7 +41,7 @@ function setup_sudoers ()
    local SU_MSG="Your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} is not in the sudoers file."
    local SU_MSG2="Please enter the ${cyn:?}root${end:?} user password to setup ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} sudoers."
    local SUDOERS_TMP=$(mktemp)
-   local SUDO_MSG="Creating user ${QUBINODE_ADMIN_USER} sudoers file /etc/sudoers.d/${QUBINODE_ADMIN_US}"
+   local SUDO_MSG="Creating user ${QUBINODE_ADMIN_USER} sudoers file /etc/sudoers.d/${QUBINODE_ADMIN_USER}"
    # clear sudo cache
    sudo -k
 
@@ -806,9 +806,9 @@ function ask_for_admin_user_pass () {
         printf "%s\n" " ${blu:?} Admin User Credentials${end:?}"
 	printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         printf "%s\n" "  In order to provide you with the best experince, we need your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} password."
-        printf "%s\n" "  We use the password once to setup password less sudoers and add your login"
+        printf "%s\n" "  We use the password once to setup password less sudoers and to add your login"
         printf "%s\n" "  to VMs we create. We store this password along with every other secrets in"
-	printf "%s\n" " ${cyn:?}${project_dir}/playbooks/vars/qubinode_vault.yml${end:?} and encrypt"
+	printf "%s\n" "  ${cyn:?}${project_dir}/playbooks/vars/qubinode_vault.yml${end:?} and encrypt"
         printf "%s\n\n" "  it with ${cyn:?}ansible-vault${end:?}."
 
         MSG_ONE="Enter a password for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
