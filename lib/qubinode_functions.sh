@@ -23,6 +23,14 @@ function check_args () {
     fi
 }
 
+function run_su_cmd()
+{
+    # this fucntion is used with setup_sudoers
+    local cmd=$@
+    su -c "$cmd"
+    return $?
+}
+
 function setup_sudoers () 
 {
    local __admin_pass="$1"
