@@ -39,10 +39,9 @@ function setup_sudoers ()
    local HAS_SUDO="none"
    local MSG="We need to setup up your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} for sudo password less access."
    local SU_MSG="Your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} is not in the sudoers file."
-   local SU_MSG2="The next prompt with ask you to enter the ${cyn:?}root{end:?} user password to setup sudoers using the ${cyn:?}su{end:?} command."
+   local SU_MSG2="Please enter the ${cyn:?}root${end:?} user password to setup ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} sudoers."
    local SUDOERS_TMP=$(mktemp)
-   local SUDO_MSG="Creating user ${QUBINODE_ADMIN_USER} sudoers file /etc/sudoers.d/${QUBINODE_ADMIN_USER}"
-
+   local SUDO_MSG="Creating user ${QUBINODE_ADMIN_USER} sudoers file /etc/sudoers.d/${QUBINODE_ADMIN_US}"
    # clear sudo cache
    sudo -k
 
@@ -78,11 +77,11 @@ function setup_sudoers ()
            do
                run_su_cmd "$CMD" && break
                retry=$[${retry}+1]
-               printf "   ${cyn:?}Retrying ${end:?}"
+               printf "%s\n" "  ${cyn:?}Try again. Enter the root user ${end:?}"
            done
 
           if [ ${retry} -ge ${maxRetries} ]; then
-              printf "   ${red:?}Error: Could not authenicate as the root user.${end:?}"
+              printf "%s\n" "   ${red:?}Error: Could not authenicate as the root user.${end:?}"
               exit 1
           fi
        else
@@ -806,11 +805,11 @@ function ask_for_admin_user_pass () {
         printf "%s\n\n" ""
         printf "%s\n" " ${blu:?} Admin User Credentials${end:?}"
 	printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n" " In order to provide you with the best experince, we need your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} password."
-        printf "%s\n" " We use the password once to setup password less sudoers."
-        printf "%s\n" " We als use it to add your login to VMs we create."
-        printf "%s\n" "  We store this password along with every other secrets in ${cyn:?}${project_dir}/playbooks/vars/qubinode_vault.yml${end:?}."
-        printf "%s\n\n" "  We encrypt in with ${cyn:?}ansible-vault${end:?}."
+        printf "%s\n" "  In order to provide you with the best experince, we need your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} password."
+        printf "%s\n" "  We use the password once to setup password less sudoers and add your login"
+        printf "%s\n" "  to VMs we create. We store this password along with every other secrets in"
+	printf "%s\n" " ${cyn:?}${project_dir}/playbooks/vars/qubinode_vault.yml${end:?} and encrypt"
+        printf "%s\n\n" "  it with ${cyn:?}ansible-vault${end:?}."
 
         MSG_ONE="Enter a password for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
         MSG_TWO="Enter a password again for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
