@@ -59,7 +59,7 @@ function setup_sudoers ()
 
        if grep -q "${QUBINODE_ADMIN_USER} is not in the sudoers file" "$TMP_RESULT"
        then
-           local CMD="cp -fp ${SUDOERS_TMP} /etc/sudoers.d/${QUBINODE_ADMIN_USER}"
+           local CMD="cp -f ${SUDOERS_TMP} /etc/sudoers.d/${QUBINODE_ADMIN_USER}"
            printf "%s\n" "  ${SU_MSG}"
 	   confirm "  Continue setting up sudoers for ${QUBINODE_ADMIN_USER}? ${cyn:?}yes/no${end:?}"
 	   if [ "A${response}" == "Ano" ]
@@ -87,21 +87,13 @@ function setup_sudoers ()
        else
            printf "%s\n" "  ${SUDO_MSG}"
            echo "$__admin_pass" | sudo -S cp -f "${SUDOERS_TMP}" "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
-           echo "$__admin_pass" | sudo -S cp "${SUDOERS_TMP}" "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
            echo "$__admin_pass" | sudo -S chmod 0440 "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
        fi
    fi
 
-   if ! prompt=$(sudo -n ls 2>&1)
-   then
-       printf "%s\n" "Setting up passwordless sudo for $QUBINODE_ADMIN_USER was unsuccessful"
-       printf "%s\n" "Error msg: $prompt"
-       exit 1
-   fi
-
    # Confirm sudo setup
    sudo -k
-   echo "$__admin_pass" | sudo -S ls 2> "$TMP_RESULT" 1> /dev/null || HAS_SUDO=no
+   echo "$__admin_pass" | sudo -S ls 2> "$TMP_RESULT" 1> /dev/null && HAS_SUDO=yes
    if [ "$HAS_SUDO" == "no" ]
    then
        printf "   ${red:?}Error: Sudo setup was unsuccesful${end:?}"
@@ -700,18 +692,35 @@ function rhsm_get_reg_method () {
     local user_response
     printf "%s\n\n" ""
     printf "%s\n" "  ${blu:?}Red Hat Subscription Registration${end:?}"
-    printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+    printf "%s\n" "  ${blu:?}****************************************************************************${end:?}"
 
-    printf "%s\n" "  Your credentials for access.redhat.com is needed."
-    printf "%s\n" "  RHSM registration has two methods:"
-    printf "%s\n" "     option 1: ${cyn:?}activation key${end:?}"
-    printf "%s\n\n" "     option 2: ${cyn:?}username/password${end:?}"
-    printf "%s\n\n" "  Option 2 is the most commonly used"
-    printf "%s\n" "  ${blu:?}Choose a registration method${end:?}"
-    rhsm_msg=("Activation Key" "Username and Password")
-    createmenu "${rhsm_msg[@]}"
-    user_response="${selected_option}"
-    RHSM_REG_METHOD=$(echo "${user_response}"|awk '{print $1}')
+    printf "%s\n" "  The goal of the qubinode-installer is to automate the installation of"
+    printf "%s\n" "  supported Red Hat products To provide this experience we ask for a method"
+    printf "%s\n" "  to register your Red Hat product and current system to the Red Hat Customer"
+    printf "%s\n" "  portal."
+
+    printf "%s\n" "  You can skip this step if your system is already registered and you are not"
+    printf "%s\n\n" "  interested in using the installer to deploy any Red Hat product."
+    confirm "  Continue with providing a method to register to Red Hat? ${blu:?}yes/no${end:?}"
+    if [ "A${response}" == "Ayes" ]
+    then
+        printf "%s\n" ""
+        printf "%s\n" "  The two available methods are:"
+        printf "%s\n" "     option 1: ${cyn:?}activation key${end:?}"
+	printf "%s\n\n" "     option 2: ${cyn:?}username/password${end:?} (most common)"
+        printf "%s\n" "  Which method would you like to use?"
+        rhsm_msg=("Activation Key" "Username and Password")
+        createmenu "${rhsm_msg[@]}"
+        user_response="${selected_option}"
+        RHSM_REG_METHOD=$(echo "${user_response}"|awk '{print $1}')
+    else
+        check_rhsm_status
+        if [ "${system_registered}" == "no" ]
+        then
+            printf "%s\n" "  Please register your system and run the installer again."
+	    exit 1
+        fi
+    fi
 }
 
 function accept_sensitive_input () {
@@ -768,7 +777,8 @@ function rhsm_credentials_prompt () {
     then
         if [ "A${rhsm_org}" == 'Anone' ]
         then
-            printf "%s\n\n" ""
+            printf "%s\n" ""
+            printf "%s\n\n" "Your RHSM org ID is saved in ${project_dir}/playbooks/vars/qubinode_vault.yml."
 	    MSG_ONE="Enter your RHSM org id and press ${cyn:?}[ENTER]${end:?}:"
             MSG_TWO="Enter your RHSM org id again ${cyn:?}[ENTER]${end:?}:"
 	    accept_sensitive_input
@@ -1115,22 +1125,46 @@ function install_packages () {
     printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
     # check if packages needs to be installed
     local enabled_repos
+    local repos_needed=no
     enabled_repos=$(mktemp)
     sudo subscription-manager repos --list-enabled | awk '/Repo ID:/ {print $3}' > "$enabled_repos"
     for repo in $rhel8_repos
     do
         if ! grep -q $repo "$enabled_repos"
         then
-            printf "%s\n\n" "  ${cyn:?}Enabling repo $repo${end:?}"
-            if ! sudo subscription-manager repos --enable="$repo" > /dev/null 2>&1
-	    then
-                printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}"
-		exit 1
-	    fi
-        else
-            printf "%s\n\n" "  ${yel:?}Yum repo "$repo" is enabled${end:?}"
+	    repos_needed=yes
+	    break
         fi
     done
+    if [ "${repos_needed}" == "yes" ]
+    then
+        printf "%s\n" "  The installer needs to ensure the below repos are enabled and available:"
+        printf "%s\n\n" "  $rhel8_repos"
+        confirm "  Do you want to continue? ${cyn:?}yes/no${end:?}"
+        if [ "A${response}" == "Ano" ]
+        then
+            printf "%s\n" "  You can manually ensure the above repos are enabled and try again."
+            exit 0
+        else
+            # check if packages needs to be installed
+            for repo in $rhel8_repos
+            do
+                if ! grep -q $repo "$enabled_repos"
+                then
+                    #printf "%s\n\n" "  ${cyn:?}Enabling the required Red Hat repositories.${end:?}"
+                    if ! sudo subscription-manager repos --enable="$repo" > /dev/null 2>&1
+                    then
+                        printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}"
+                	exit 1
+                    fi
+                #else
+                #    printf "%s\n\n" "  ${yel:?}Yum repo "$repo" is enabled${end:?}"
+                fi
+            done
+        fi
+
+    fi
+
 
     printf "%s\n" ""
     printf "%s\n" "  ${blu:?}Ensure required packages are installed${end:?}"

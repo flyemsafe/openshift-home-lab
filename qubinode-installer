@@ -114,8 +114,8 @@ function qubinode_baseline () {
     setup_sudoers "$admin_user_password"
 
     ## Check system registration status
-    check_rhsm_status
     ask_user_for_rhsm_credentials
+    check_rhsm_status
     register_system
 
     ## install required software dependancies
