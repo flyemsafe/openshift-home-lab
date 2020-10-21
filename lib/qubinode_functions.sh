@@ -1101,7 +1101,8 @@ function deploy_new_idm ()
 ## YUM, PIP packages and Ansible roles, collections
 ##---------------------------------------------------------------------
 
-function install_packages () {
+function install_packages () 
+{
     ## set local vars from environment variables
     local rhsm_system="$RHSM_SYSTEM"
     local rhel_release="$RHEL_RELEASE"
@@ -1125,7 +1126,7 @@ function install_packages () {
     printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
     # check if packages needs to be installed
     local enabled_repos
-    local repos_needed=no
+    local repos_needed
     enabled_repos=$(mktemp)
     sudo subscription-manager repos --list-enabled | awk '/Repo ID:/ {print $3}' > "$enabled_repos"
     for repo in $rhel8_repos
@@ -1136,7 +1137,7 @@ function install_packages () {
 	    break
         fi
     done
-    if [ "${repos_needed}" == "yes" ]
+    if [ "${repos_needed:-none}" == "yes" ]
     then
         printf "%s\n" "  The installer needs to ensure the below repos are enabled and available:"
         printf "%s\n\n" "  $rhel8_repos"
@@ -1151,69 +1152,56 @@ function install_packages () {
             do
                 if ! grep -q $repo "$enabled_repos"
                 then
-                    #printf "%s\n\n" "  ${cyn:?}Enabling the required Red Hat repositories.${end:?}"
                     if ! sudo subscription-manager repos --enable="$repo" > /dev/null 2>&1
                     then
                         printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}"
                 	exit 1
                     fi
-                #else
-                #    printf "%s\n\n" "  ${yel:?}Yum repo "$repo" is enabled${end:?}"
                 fi
             done
         fi
 
     fi
 
-
+   ## Install rpm and pip packages
     printf "%s\n" ""
     printf "%s\n" "  ${blu:?}Ensure required packages are installed${end:?}"
     printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-    # check if packages needs to be installed
+
+   # check if packages needs to be installed
+    local packages_needed
     for pkg in $yum_packages
     do
         if ! rpm -q "$pkg" > /dev/null 2>&1
         then
-            printf "%s\n\n" "  ${cyn:?}Installing $pkg${end:?}"
-            if ! sudo yum install -y "$pkg" > /dev/null 2>&1 
-	    then
-	        printf "%s\n" "  ${red:?}Failed to install "$pkg"${end:?}"
-		exit 1
-	    fi
-        else
-            printf "%s\n\n" "  ${yel:?}Package "$pkg" is installed${end:?}"
+            packages_needed=yes
         fi
     done
 
-
-    if [ "A${python3_installed}" == "A" ]
+    ## Install RPM Packages
+    if [ "${packages_needed:-none}" == "yes" ]
     then
-        printf "%s\n" ""
-        printf "%s\n" "  ${blu:?}Installing python36${end:?}"
-        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        if ! sudo yum install -y "$python_packages" > /dev/null 2>&1 
-	then
-	    printf "%s\n" "  ${red:?}Failed to install python36${end:?}"
-	    exit 1
-	else
-            PYTHON3_INSTALLED=yes
-	    PYTHON3_INSTALLED=no
-	fi
-    fi
-
-    ## ensure ansible is installed
-    if [ "A${ansible_installed}" == "Ano" ]
-    then
-        printf "%s\n" ""
-        printf "%s\n" "  ${blu:?}Install ansible${end:?}"
-        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        if ! sudo yum install -y "$ansible_packages" > /dev/null 2>&1 
-	then
-	    printf "%s\n" "  ${red:?}Failed to ansible packages${end:?}"
-	    exit 1
-	else
-	    ANSIBLE_INSTALLED=yes
-	    ANSIBLE_INSTALLED=no
+        printf "%s\n" "  The installer needs to install some RPMs before we can continue."
+        confirm "  Do you want to continue? ${cyn:?}yes/no${end:?}"
+        if [ "A${response}" == "Ano" ]
+        then
+            printf "%s\n" "  You can manually ensure all the below packages are installed and try again."
+            printf '%s\n' "${packages_needed:-}"
+            exit 0
+        else
+            # check if packages needs to be installed
+            printf "%s\n\n" "  ${cyn:?}Installing required packages${end:?}"
+            for pkg in $yum_packages
+            do
+                if ! rpm -q "$pkg" > /dev/null 2>&1
+                then
+                    if ! sudo yum install -y "$pkg" > /dev/null 2>&1
+                    then
+                        printf "%s\n" "  ${red:?}Failed to install "$pkg"${end:?}"
+                        exit 1
+                    fi
+                fi
+            done
 	fi
     fi
 
@@ -1221,6 +1209,7 @@ function install_packages () {
     ## install pip3 packages
     if which /usr/bin/pip3 > /dev/null 2>&1
     then
+        printf "%s\n" ""
         printf "%s\n" "  ${blu:?}Ensure required pip packages are present${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         for pkg in $pip_packages
