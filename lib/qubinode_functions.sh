@@ -26,28 +26,72 @@ function check_args () {
 function setup_sudoers () 
 {
    local __admin_pass="$1"
+   local TMP_RESULT=$(mktemp)
+   local TMP_RESULT2=$(mktemp)
+   local HAS_SUDO="none"
+   local MSG="We need to setup up your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} for sudo password less access."
+   local SU_MSG="Your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} is not in the sudoers file."
+   local SU_MSG2="Please supply root password for the following command: "
+   local SUDOERS_TMP=$(mktemp)
+   local SUDO_MSG="Creating user ${QUBINODE_ADMIN_USER} sudoers file /etc/sudoers.d/${QUBINODE_ADMIN_USER}"
+
+   # clear sudo cache
    sudo -k
-   if ! prompt=$(sudo -n ls 2>&1)
+
+   # Check if user is setup for sudo
+   echo "$__admin_pass" | sudo -S ls 2> "$TMP_RESULT" 1> /dev/null || HAS_SUDO=no
+   echo "${QUBINODE_ADMIN_USER} ALL=(ALL) NOPASSWD:ALL" > "${SUDOERS_TMP}"
+   chmod 0440 "${SUDOERS_TMP}"
+
+   if [ "$HAS_SUDO" == "no" ]
    then
        printf "%s\n" ""
        printf "%s\n" "  ${blu:?}Setup Sudoers${end:?}"
        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-       printf "%s\n" "  The qubinode-installer runs as a normal user. It sets up your username ${QUBINODE_ADMIN_USER}"
-       printf "%s\n" "  for passwordless sudo."
-       printf "%s\n" ""
-       SUDOERS_TMP=$(mktemp)
-       echo "${QUBINODE_ADMIN_USER} ALL=(ALL) NOPASSWD:ALL" > "${SUDOERS_TMP}"
-       #echo "$__admin_pass" | sudo -S test -f "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
-       echo "$__admin_pass" | sudo -S cp "${SUDOERS_TMP}" "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
-       echo "$__admin_pass" | sudo -S chmod 0440 "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
+       printf "%s\n" "  ${MSG}"
+
+       if grep -q "${QUBINODE_ADMIN_USER} is not in the sudoers file" "$TMP_RESULT"
+       then
+           local CMD="cp -fp ${SUDOERS_TMP} /etc/sudoers.d/${QUBINODE_ADMIN_USER}"
+           printf "%s\n" "  ${SU_MSG}"
+           printf "%s\n" " $SU_MSG2 ${cyn:?}su -c \"$CMD\"${end:?}"
+
+           retry=0
+           maxRetries=3
+           retryInterval=15
+           until [ ${retry} -ge ${maxRetries} ]
+           do
+               run_su_cmd "$CMD" && break
+               retry=$[${retry}+1]
+               printf "   ${cyn:?}Retrying ${end:?}"
+           done
+
+          if [ ${retry} -ge ${maxRetries} ]; then
+              printf "   ${red:?}Error: Could not authenicate as the root user.${end:?}"
+              exit 1
+          fi
+       else
+           printf "%s\n" "  ${SUDO_MSG}"
+           echo "$__admin_pass" | sudo -S cp -f "${SUDOERS_TMP}" "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
+           echo "$__admin_pass" | sudo -S cp "${SUDOERS_TMP}" "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
+           echo "$__admin_pass" | sudo -S chmod 0440 "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
+       fi
    fi
 
-   # check again
    if ! prompt=$(sudo -n ls 2>&1)
    then
        printf "%s\n" "Setting up passwordless sudo for $QUBINODE_ADMIN_USER was unsuccessful"
        printf "%s\n" "Error msg: $prompt"
        exit 1
+   fi
+
+   # Confirm sudo setup
+   sudo -k
+   echo "$__admin_pass" | sudo -S ls 2> "$TMP_RESULT" 1> /dev/null || HAS_SUDO=no
+   if [ "$HAS_SUDO" == "no" ]
+   then
+       printf "   ${red:?}Error: Sudo setup was unsuccesful${end:?}"
+       exit
    fi
 }
 
@@ -232,7 +276,7 @@ function verify_networking () {
         printf "%s\n" "  The default libvirt network name is a nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
         printf "%s\n" "  A bridge libvirt network is created to make it easy to access VM's running on the qubinode."
         printf "%s\n\n" "  A bridge network makes it easy to connect from your laptop/desktop/workstation to VMs on the Qubinode."
-        printf "%s\n" "  You can skip setting up a bridge network and use the default or specify your own."
+        printf "%s\n" "  You can skip setting up a bridge network and use the default or specify an existing libvirt network to use."
     
         confirm_menu_option "${libvirt_net_choices[*]}" "$libvirt_net_msg" libvirt_net_choice
         if [ "A${libvirt_net_choice}" == "ASpecify" ]
