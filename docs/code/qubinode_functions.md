@@ -40,11 +40,17 @@ then setting the result as a varible.
 #### Example
 
 ```bash
-   toaddr $NETMASKNUM NETMASK
-@arg $1 number returned by tonum
-@arg $2 variable to set the result to
-@stdout Returns a valid network address
+toaddr $NETMASKNUM NETMASK
 ```
+
+#### Arguments
+
+* **$1** (number): returned by tonum
+* **$2** (variable): to set the result to
+
+#### Output on stdout
+
+* Returns a valid network address
 
 ### tonum()
 
