@@ -333,6 +333,7 @@ function libvirt_network_info () {
     confirm_libvirt_network="${CONFIRM_LIBVIRT_NETWORK:-yes}"
 
     local libvirt_net_choices
+    local libvirt_net_choice
     local libvirt_net_selections
     local libvirt_net_msg
     libvirt_net_selections="Skip Specify Continue"
@@ -345,10 +346,13 @@ function libvirt_network_info () {
         printf "%s\n" "  ${blu:?}Networking Details${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         printf "%s\n" "  The default libvirt network name is a nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
-        printf "%s\n" "  A bridge libvirt network is created to make it easy to access VM's running on the qubinode."
-        printf "%s\n\n" "  A bridge network makes it easy to connect from your laptop/desktop/workstation to VMs on the Qubinode."
-        printf "%s\n" "  You can skip setting up a bridge network and use the default or specify an existing libvirt network to use."
-    
+        printf "%s\n\n" "  A bridge libvirt network is created to make it easy to access"
+        printf "%s\n" "  Choose ${cyn:?}Skip${end:?} if your libvirt network ${cyn:?}${libvirt_network_name}${end:?} is already configured"
+        printf "%s\n" "  as a bridged network."
+        printf "%s\n" "  Choose ${cyn:?}Specify${end:?} to enter the name of an existing"
+        printf "%s\n" "  libvirt network you would like to use."
+        printf "%s\n" "  Choose ${cyn:?}Continue${end:?} to proceed with creating a libvirt bridge network."
+     
         confirm_menu_option "${libvirt_net_choices[*]}" "$libvirt_net_msg" libvirt_net_choice
         if [ "A${libvirt_net_choice}" == "ASpecify" ]
         then
@@ -449,24 +453,19 @@ function verify_networking_info () {
 ##---------------------------------------------------------------------
 ## Check for RHSM registration
 ##---------------------------------------------------------------------
-function pre_os_check () {
+# @description
+# Determine if host is RHEL and sets the vars:
+# * rhel_release
+# * rhel_major
+# * os_name
+#
+function pre_os_check() {
     # shellcheck disable=SC2034
     rhel_release=$(< /etc/redhat-release grep -o "[7-8].[0-9]")
     # shellcheck disable=SC2034
     rhel_major=$(sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release)
     os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
     RHSM_SYSTEM=no
-    if [ "A${os_name}" == 'A"Red Hat Enterprise Linux"' ]
-    then
-        RHSM_SYSTEM=yes
-        if ! which subscription-manager > /dev/null 2>&1
-        then
-            printf "%s\n" ""
-            printf "%s\n" " ${red:?}Error: subcription-manager command not found.${end:?}"
-            printf "%s\n" " ${red:?}The subscription-manager command is required.${end:?}"
-	    exit 1
-	fi
-    fi
 
     ## setup vars for export
     rhsm_system="$RHSM_SYSTEM"
@@ -476,8 +475,22 @@ function pre_os_check () {
     export RHSM_SYSTEM="$RHSM_SYSTEM"
 }
 
-	    
+# @description
+# If host is RHEL, verify subcription-manager command is available.
+# Exists the installer if subscription-manager not found.
+# If subscription-manager is found, determine if the host is registered to Red Hat.
 function check_rhsm_status () {
+    if [ "A${os_name}" == 'A"Red Hat Enterprise Linux"' ]
+    then
+        RHSM_SYSTEM=yes
+        if ! which subscription-manager > /dev/null 2>&1
+        then
+            printf "%s\n" ""
+            printf "%s\n" " ${red:?}Error: subcription-manager command not found.${end:?}"
+            printf "%s\n" " ${red:?}The subscription-manager command is required.${end:?}"
+	        exit 1
+	    fi
+    fi    
     ## define message var
     local system_registered_msg
     system_registered_msg="$(hostname) is registered to Red Hat"
@@ -497,8 +510,10 @@ function check_rhsm_status () {
     printf "%s\n" "  ${yel:?}${system_registered_msg}${end:?}"
 }
 
+# @description
+# Deteremine if the registered RHEL host is has a subscription attached to it.
 function verify_rhsm_status () {
-   
+
    ## Ensure the system is registered
    sudo subscription-manager identity > /dev/null 2>&1
    sub_identity_status="$?"
@@ -535,6 +550,8 @@ function verify_rhsm_status () {
    fi
 }
 
+# @description
+# Register the RHEL host to Red Hat
 function register_system () {
     ## set default rhsm system
     rhsm_system="${RHSM_SYSTEM:-no}"
@@ -579,6 +596,8 @@ function register_system () {
 ##---------------------------------------------------------------------
 ## Get User Input
 ##---------------------------------------------------------------------
+# @description
+# Ask user to confirm input.
 function confirm_menu_option () 
 {
     entry_is_correct=""
@@ -612,7 +631,8 @@ function confirm_menu_option ()
     done
 }
 
-## confirm with user if they want to continue
+# @description
+# Confirm with user if they want to continue with a given input or choice.
 function confirm () {
     continue=""
     while [[ "${continue}" != "yes" ]];
@@ -633,7 +653,8 @@ function confirm () {
     done
 }
 
-## accept input from user and return the input
+# @description
+# Accepts input from user and return what the users input.
 function accept_user_input ()
 {
     local __questionvar="$1"
@@ -652,7 +673,8 @@ function accept_user_input ()
     fi
 }
 
-## confirm if input is correct
+# @description
+# Confirms if the user input is correct.
 function confirm_correct () {
     entry_is_correct=""
     local __user_question=$1
@@ -680,9 +702,8 @@ function confirm_correct () {
     done
 }
 
-# generic user choice menu
-# this should eventually be used anywhere we need
-# to provide user with choice
+# @description
+# A generic user choice menu used to provide user with choice.
 function createmenu () {
     select selected_option; do # in "$@" is the default
         if ! [[ "$REPLY" =~ ^[0-9]+$ ]]
@@ -703,8 +724,8 @@ function createmenu () {
     done
 }
 
-# this configs prints out asterisks when sensitive data
-# is being entered
+# @description
+# Outputs asterisks when sensitive data is entered by the user.
 function read_sensitive_data () {
     # based on shorturl.at/BEHY3
     sensitive_data=''
@@ -724,6 +745,8 @@ function read_sensitive_data () {
     done
 }
 
+# @description
+# Read variables from ansible encrupted vault file.
 function load_vault_vars () 
 {
     vault_parse_cmd="cat"
@@ -731,8 +754,8 @@ function load_vault_vars ()
     then
         if ansible-vault view "${VAULT_FILE}" >/dev/null 2>&1
         then
-	    vault_parse_cmd="ansible-vault view"
-	fi
+	        vault_parse_cmd="ansible-vault view"
+	    fi
     fi
 
     if [ -f "${VAULT_FILE}" ]
@@ -743,19 +766,21 @@ function load_vault_vars ()
         RHSM_ACTKEY=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^rhsm_activationkey:/ {print $2}')
         ADMIN_USER_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^admin_user_password:/ {print $2}')
 
-	# shellcheck disable=SC2034 # used when vault file is generated
+	    # shellcheck disable=SC2034 # used when vault file is generated
         IDM_DM_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^idm_dm_pwd:/ {print $2}')
         IDM_ADMIN_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^idm_admin_pwd:/ {print $2}')
 	
-	# shellcheck disable=SC2034 # used when vault file is generated
+	    # shellcheck disable=SC2034 # used when vault file is generated
         TOWER_PG_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^tower_pg_password:/ {print $2}')
         
-	# shellcheck disable=SC2034 # used when vault file is generated
-	TOWER_MQ_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^tower_rabbitmq_password:/ {print $2}')
+	    # shellcheck disable=SC2034 # used when vault file is generated
+	    TOWER_MQ_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^tower_rabbitmq_password:/ {print $2}')
         #IDM_USER_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^idm_admin_pwd:/ {print $2}')
     fi
 }
 
+# @description
+# Ask the user if they want to register the host to Red Hat using username/password or activationkey/org-id.
 function rhsm_get_reg_method () {
     local user_response
     printf "%s\n\n" ""
@@ -763,7 +788,7 @@ function rhsm_get_reg_method () {
     printf "%s\n" "  ${blu:?}****************************************************************************${end:?}"
 
     printf "%s\n" "  The goal of the qubinode-installer is to automate the installation of"
-    printf "%s\n" "  supported Red Hat products To provide this experience we ask for a method"
+    printf "%s\n" "  supported Red Hat products. To provide this experience we ask for a method"
     printf "%s\n" "  to register your Red Hat product and current system to the Red Hat Customer"
     printf "%s\n" "  portal."
 
@@ -775,7 +800,7 @@ function rhsm_get_reg_method () {
         printf "%s\n" ""
         printf "%s\n" "  The two available methods are:"
         printf "%s\n" "     option 1: ${cyn:?}activation key${end:?}"
-	printf "%s\n\n" "     option 2: ${cyn:?}username/password${end:?} (most common)"
+	    printf "%s\n\n" "     option 2: ${cyn:?}username/password${end:?} (most common)"
         printf "%s\n" "  Which method would you like to use?"
         rhsm_msg=("Activation Key" "Username and Password")
         createmenu "${rhsm_msg[@]}"
@@ -791,6 +816,8 @@ function rhsm_get_reg_method () {
     fi
 }
 
+# @description
+# Takes in senstive input from user.
 function accept_sensitive_input () {
     printf "%s\n" ""
     printf "%s\n" "  Try not to ${cyn:?}Backspace${end:?} to correct a typo, "
@@ -813,7 +840,8 @@ function accept_sensitive_input () {
     done
 }
 
-        
+# @description
+# Ask user for credentials to register system to Red Hat.        
 function rhsm_credentials_prompt () {
 
     rhsm_reg_method="${RHSM_REG_METHOD:-none}"
@@ -826,19 +854,19 @@ function rhsm_credentials_prompt () {
         if [ "A${rhsm_username}" == "Anone" ]
         then
             printf "%s\n" ""
-	    confirm_correct "Enter your RHSM username and press" RHSM_USERNAME
+	        confirm_correct "Enter your RHSM username and press" RHSM_USERNAME
         fi
 
         if [ "A${rhsm_password}" == 'Anone' ]
         then
-	    MSG_ONE="Enter your RHSM password and press ${cyn:?}[ENTER]${end:?}:"
+	        MSG_ONE="Enter your RHSM password and press ${cyn:?}[ENTER]${end:?}:"
             MSG_TWO="Enter your RHSM password password again ${cyn:?}[ENTER]${end:?}:"
-	    accept_sensitive_input
+	        accept_sensitive_input
             RHSM_PASSWORD="${sensitive_data}"
         fi
 
-	## set registration argument
-	RHSM_CMD_OPTS="--username=${RHSM_USERNAME} --password=${RHSM_PASSWORD}"
+	    ## set registration argument
+	    RHSM_CMD_OPTS="--username=${RHSM_USERNAME} --password=${RHSM_PASSWORD}"
     fi
 
     if [ "A${rhsm_reg_method}" == "AActivation" ]
@@ -847,34 +875,38 @@ function rhsm_credentials_prompt () {
         then
             printf "%s\n" ""
             printf "%s\n\n" "Your RHSM org ID is saved in ${project_dir}/playbooks/vars/qubinode_vault.yml."
-	    MSG_ONE="Enter your RHSM org id and press ${cyn:?}[ENTER]${end:?}:"
+	        MSG_ONE="Enter your RHSM org id and press ${cyn:?}[ENTER]${end:?}:"
             MSG_TWO="Enter your RHSM org id again ${cyn:?}[ENTER]${end:?}:"
-	    accept_sensitive_input
+	        accept_sensitive_input
             RHSM_ORG="${sensitive_data}"
         fi
 
         if [ "A${rhsm_actkey}" == 'Anone' ]
         then
-	    confirm_correct "Enter your RHSM activation key" RHSM_ACTKEY
+	       confirm_correct "Enter your RHSM activation key" RHSM_ACTKEY
         fi
 
-	## Set registration argument
-	RHSM_CMD_OPTS="--org=${RHSM_ORG} --activationkey=${RHSM_ACTKEY}"
+	    ## Set registration argument
+	    RHSM_CMD_OPTS="--org=${RHSM_ORG} --activationkey=${RHSM_ACTKEY}"
     fi
 }
 
+# @description
+# This is a wrapper to call functions rhsm_get_reg_method and rhsm_credentials_prompt.
 function ask_user_for_rhsm_credentials () {
     rhsm_reg_method="${RHSM_REG_METHOD:-none}"
 
     if [ "A${rhsm_reg_method}" == "Anone" ]
     then
-	rhsm_get_reg_method
+	    rhsm_get_reg_method
         rhsm_credentials_prompt
     else
         rhsm_credentials_prompt
     fi
 }
 
+# @description
+# Ask the user for their password.
 function ask_for_admin_user_pass () {
     admin_user_password="${ADMIN_USER_PASS:-none}"
     # root user password to be set for virtual instances created
@@ -882,12 +914,13 @@ function ask_for_admin_user_pass () {
     then
         printf "%s\n\n" ""
         printf "%s\n" " ${blu:?} Admin User Credentials${end:?}"
-	printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n" "  In order to provide you with the best experince, we need your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} password."
-        printf "%s\n" "  We use the password once to setup password less sudoers and to add your login"
-        printf "%s\n" "  to VMs we create. We store this password along with every other secrets in"
-	printf "%s\n" "  ${cyn:?}${project_dir}/playbooks/vars/qubinode_vault.yml${end:?} and encrypt"
-        printf "%s\n\n" "  it with ${cyn:?}ansible-vault${end:?}."
+	    printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+        printf "%s\n" "  Your password for your username ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} is needed to allow"
+        printf "%s\n" "  the installer to setup password-less sudoers. Your password"
+        printf "%s\n" "  and other secrets will be stored in a encrypted ansible vault file"
+	    printf "%s\n\n" "  ${cyn:?}${project_dir}/playbooks/vars/qubinode_vault.yml${end:?}."
+        printf "%s\n" "  You can view this file by executing: "
+        printf "%s\n\n" "  ${cyn:?}ansible-vault ${project_dir}/playbooks/vars/qubinode_vault.yml ${end:?}"
 
         MSG_ONE="Enter a password for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
         MSG_TWO="Enter a password again for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
@@ -896,6 +929,9 @@ function ask_for_admin_user_pass () {
     fi
 }
 
+# @description
+# If multiple disk devices are found on the kvm host, ask the user if they
+# would like to dedicate a disk device for /var/lib/libivrt/images.
 function check_additional_storage () {
     getPrimaryDisk
     create_libvirt_lvm="${CREATE_LIBVIRT_STORAGE:-yes}"
@@ -915,32 +951,36 @@ function check_additional_storage () {
         confirm "  Do you want to change it? ${blu:?}yes/no${end:?}"
         if [ "A${response}" == "Ayes" ]
         then
-	    confirm_correct "Enter a new path" LIBVIRT_DIR
-	fi
+	        confirm_correct "Enter a new path" LIBVIRT_DIR
+            #TODO: confirm new path exist, if not exist ask user if it should be created.
+	    fi
         printf "%s\n" "  The default libvirt dir pool name is ${cyn:?}$libvirt_pool_name${end:?}."
         confirm "  Do you want to change it? ${blu:?}yes/no${end:?}"
         if [ "A${response}" == "Ayes" ]
         then
-	    confirm_correct "Enter the name of the libvirt dir pool you would like to use" libvirt_pool_name
-	fi
+	        confirm_correct "Enter the name of the libvirt dir pool you would like to use" libvirt_pool_name
+	    fi
         libvirt_dir_verify=no
     fi
 
     if [[ "A${create_libvirt_lvm}" == "Ayes" ]] && [[ "A${libvirt_pool_disk}" == "Anone" ]]
     then
-        printf "%s\n\n" ""
-        printf "%s\n" "  ${blu:?}Dedicated Storage Device For Libvirt Directory Pool${end:?}"
-        printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-        printf "%s\n" "   It is recommended to dedicate a disk to ${cyn:?}$LIBVIRT_DIR${end:?}."
-        printf "%s\n" "   Qubinode uses libvirt directory pool for VM disk storage"
-        printf "%s\n" ""
-
-	local AVAILABLE_DISKS
-	IFS=" " read -r -a AVAILABLE_DISKS <<< "$ALL_DISK"
+	    local AVAILABLE_DISKS
+	    IFS=" " read -r -a AVAILABLE_DISKS <<< "$ALL_DISK"
         if [ ${#AVAILABLE_DISKS[@]} -gt 1 ]
         then
-            printf "%s\n" "   Your primary storage device appears to be ${blu:?}${primary_disk}${end:?}."
-            printf "%s\n\n" "   The following additional storage devices where found:"
+
+            printf "%s\n\n" ""
+            printf "%s\n" "  ${blu:?}Dedicated Storage Device For Libvirt Directory Pool${end:?}"
+            printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
+            printf "%s\n" "  Multiple storage devices are found, you can dedicate one for"
+            printf "%s\n" "  use exclusively with ${cyn:?}$LIBVIRT_DIR${end:?}. This is where"
+            printf "%s\n" "  the virtual disk devices for all VM’s are stored.Please note that"
+            printf "%s\n" "  this process wipes the storage device then creates a new volume"
+            printf "%s\n" "  group and logical volume for use with ${cyn:?}$LIBVIRT_DIR${end:?}."
+            printf "%s\n" ""
+            printf "%s\n" "  Your primary storage device appears to be ${blu:?}${primary_disk}${end:?}."
+            printf "%s\n\n" "  The following additional storage devices where found:"
 
             for disk in "${AVAILABLE_DISKS[@]}"
             do
@@ -965,6 +1005,8 @@ function check_additional_storage () {
     fi
 }
 
+# @description
+# Ask user to set a password that will be used for the IdM server.
 function ask_idm_password () {
     idm_admin_pass="${IDM_ADMIN_PASS:=none}"
     if [ "A${idm_admin_pass}" == "Anone" ]
@@ -978,6 +1020,8 @@ function ask_idm_password () {
     fi
 }
 
+# @description
+# Define a static ip address for the IdM server.
 function set_idm_static_ip () {
     printf "%s\n" ""
     confirm_correct "$static_ip_msg" idm_server_ip
@@ -987,9 +1031,9 @@ function set_idm_static_ip () {
     fi
 }
 
-
-function ask_about_domain() 
-{
+# @description
+# Ask user to enter their dns zone name.
+function ask_about_domain() {
     domain_tld="${DOMAIN_TLD:-lan}"
     generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
     domain="${DOMAIN:-$generated_domain}"
@@ -1031,8 +1075,9 @@ function ask_about_domain()
     fi
 }
 
-function connect_existing_idm ()
-{
+# @description
+# Gather the connection information from a existing IdM server.
+function connect_existing_idm () {
     idm_hostname="${generated_idm_hostname:-none}"
     #idm_hostname="${idm_server_hostname:-none}"
     static_ip_msg=" Enter the ip address for the existing IdM server"
@@ -1056,16 +1101,18 @@ function connect_existing_idm ()
     fi
 }
 
-function get_idm_server_ip () 
-{
+# @description
+# Get the ip address for a existing IdM server.
+function get_idm_server_ip () {
     if [ "A${idm_server_ip}" == "Anone" ]
     then
         set_idm_static_ip
     fi
 }
 
-function get_idm_admin_user ()
-{
+# @description
+# Get the admin username for a existing IdM server.
+function get_idm_admin_user () {
     ## set idm_admin_user vars
     idm_admin_user="${IDM_ADMIN_USER:-admin}"
     idm_admin_existing_user="${IDM_EXISTING_ADMIN_USER:-none}"
@@ -1079,9 +1126,9 @@ function get_idm_admin_user ()
     fi
 }
 
-
-function ask_about_idm ()
-{
+# @description
+# Gather data for IdM server deployment.
+function ask_about_idm () {
     ## Default variables
     idm_server_ip="${IDM_SERVER_IP:-none}"
     allow_zone_overlap="${ALLOW_ZONE_OVERLAP:-none}"
@@ -1096,7 +1143,7 @@ function ask_about_idm ()
     if [ "A${idm_server_hostname}" == "Anone" ]
     then
         generated_idm_hostname="${name_prefix}-${idm_hostname_prefix}"
-	idm_server_hostname="$generated_idm_hostname"
+	    idm_server_hostname="$generated_idm_hostname"
     fi
 
     ## Should IdM be deployed
@@ -1134,18 +1181,23 @@ function ask_about_idm ()
     fi
 }
 
-function deploy_new_idm ()
-{
+# @description
+# Gather required info for deploying a new IdM server.
+function deploy_new_idm () {
     if [ "A${idm_server_ip}" == "Anone" ]
     then
         printf "%s\n" ""
         printf "%s\n" "  The IdM server will be assigned a dynamic ip address from"
-        printf "%s\n\n" "  your network. You can assign a static ip address instead."
-        confirm "  Would you like to assign a static ip address to the IdM server? ${cyn:?}yes/no${end:?}"
+        printf "%s\n" "  your network. The ip address will be displayed after IdM"
+        printf "%s\n" "  has been deployed. You should configure you router assign"
+        printf "%s\n\n" "  the ip permanently to the IdM server."
+        printf "%s\n\n" "  You can also just specefy the ip address now."
+        confirm "  Would you like to assign a ip address to the IdM server? ${cyn:?}yes/no${end:?}"
         if [ "A${response}" == "Ayes" ]
         then
             static_ip_msg=" Enter the ip address you would like to assign to the IdM server"
             set_idm_static_ip
+            #TODO: also display the IdM server mac address once it has been deployed
         fi
     fi
 
@@ -1169,8 +1221,9 @@ function deploy_new_idm ()
 ## YUM, PIP packages and Ansible roles, collections
 ##---------------------------------------------------------------------
 
-function install_packages () 
-{
+# @description
+# Install required baseline packages
+function install_packages () {
     ## set local vars from environment variables
     local rhsm_system="$RHSM_SYSTEM"
     local rhel_release="$RHEL_RELEASE"
@@ -1296,7 +1349,8 @@ function install_packages ()
     fi
 }
 
-
+# @description
+# Installs and sets up ansible.
 function qubinode_setup_ansible ()
 {
     ## define maintenace option
@@ -1346,16 +1400,20 @@ function qubinode_setup_ansible ()
 ##---------------------------------------------------------------------
 ##  MENU OPTIONS
 ##---------------------------------------------------------------------
+# @description
+# Displays help menu.
 function display_help() {
     project_dir="${project_dir:-none}"
-    if [ -d "$project_dir" ]
+    if [ ! -d "$project_dir" ]
     then
-        printf "%s\n" "   ${red:?}Error: could not locate project_dir${end:?}" 
+        printf "%s\n" "   ${red:?}Error: could not locate ${project_dir}${end:?}" 
 	exit 1
     fi
     cat < "${project_dir}/docs/qubinode/qubinode-menu-options.adoc"
 }
 
+# @description
+# The qubinode-installer -m options.
 function qubinode_maintenance_options () {
     if [ "${qubinode_maintenance_opt}" == "clean" ]
     then

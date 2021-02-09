@@ -290,7 +290,7 @@ function main ()
     if (( "$OPTIND" == 1 ))
     then
 	    echo "$OPTIND"
-        #display_openshift_msg_ocp4
+        echo "this will eventually run display_openshift_msg_ocp4"
     elif [ "A${qubinode_product}" == "Atrue" ] && [ "A${qubinode_maintenance}" == "Atrue" ]
     then
         product_maintenance="${qubinode_maintenance_opt}"
