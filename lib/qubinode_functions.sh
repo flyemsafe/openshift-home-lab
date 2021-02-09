@@ -148,11 +148,11 @@ function getPrimaryDisk () {
 #   Takes the output from the function tonum and converts it to a network address
 #   then setting the result as a varible.
 #
-# @example
-# toaddr $NETMASKNUM NETMASK
-#
 # @arg $1 number returned by tonum
 # @arg $2 variable to set the result to
+#
+# @example
+# toaddr $NETMASKNUM NETMASK
 #
 # @stdout Returns a valid network address
 function toaddr () {
@@ -169,11 +169,14 @@ function toaddr () {
 # @description
 #   Performs bitwise operation on each octet by it's host bit lenght adding each
 #   result for the total. 
+#
 # @arg $1 the ip address or netmask
 # @arg $2 the variable to store the result it   
+#
 # @example
-#   tonum $IPADDR IPADDRNUM
-#   tonum $NETMASK NETMASKNUM
+# tonum $IPADDR IPADDRNUM
+# tonum $NETMASK NETMASKNUM
+#
 # @stdout The bitwise number for the specefied network info
 tonum() {
     if [[ $1 =~ ([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+) ]]; then
@@ -184,7 +187,13 @@ tonum() {
 }
 
 # @description
-#  Calculates network and broadcast based on supplied ip address and netmask
+#  Returns the broadcast, netmask and network for a given ip address and netmask.
+#
+# @arg $1 ipinfo Accepts either ip/cidr or ip/mask
+#
+# @example 
+# return_netmask_ipaddr 192.168.2.11/24
+# return_netmask_ipaddr 192.168.2.11 255.255.255.0
 function return_netmask_ipaddr () {
     if [[ $1 =~ ^([0-9\.]+)/([0-9]+)$ ]]; then
         # CIDR notation
@@ -228,8 +237,16 @@ function return_netmask_ipaddr () {
 ##---------------------------------------------------------------------
 ## Get network information
 ##---------------------------------------------------------------------
-function get_primary_interface () 
-{
+# @description
+# Discover which interface provides internet access and use that as the
+# default network interface. Determines the follow info about the interface.
+# * network device name
+# * ip address
+# * gateway
+# * network
+# * mac address
+# * pointer record (ptr) notation for the ip address
+function get_primary_interface () {
     ## Default Vars
     netdevice="${NETWORK_DEVICE:-none}"
     ipaddress="${IPADDRESS:-none}"
@@ -299,11 +316,15 @@ function get_primary_interface ()
     ## Verify networking
     if [ "A${confirm_networking}" == "Ayes" ]
     then
-        verify_networking
+        libvirt_network_info
     fi
 }
 
-function verify_networking () {
+# @description
+# Give user the choice of creating a NAT or Bridge libvirt network or to use
+# an existing libvirt network.
+# 
+function libvirt_network_info () {
 
     ## defaults
     libvirt_network_name="${libvirt_network_name:-default}"
@@ -347,14 +368,17 @@ function verify_networking () {
         else
             if [ "A${create_libvirt_bridge}" == "Ayes" ]
             then
-                verify_bridge_networking
+                verify_networking_info
             fi 
         fi
     fi
 }
 
-
-function verify_bridge_networking () {
+# @description
+# Asks user to confirm discovered network information.
+# 
+# @see get_primary_interface
+function verify_networking_info () {
     printf "%s\n\n" "  The below networking information was discovered and will be used for creating a bridge network."
     printf "%s\n" "  ${blu:?}NETWORK_DEVICE${end:?}=${cyn:?}${netdevice:?}${end:?}"
     printf "%s\n" "  ${blu:?}IPADDRESS${end:?}=${cyn:?}${ipaddress:?}${end:?}"
