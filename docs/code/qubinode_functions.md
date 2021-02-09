@@ -1,4 +1,4 @@
-# qubinode_functions
+# lib/qubinode_functions.sh
 
 A library of bash functions for getting the kvm host ready for ansible.
 
