@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# @name Qubinode Functions
 # @file lib/qubinode_functions.sh
 # @brief A library of bash functions for getting the kvm host ready for ansible.
 # @description
@@ -148,10 +147,13 @@ function getPrimaryDisk () {
 # @description
 #   Takes the output from the function tonum and converts it to a network address
 #   then setting the result as a varible.
+#
 # @example
-#    toaddr $NETMASKNUM NETMASK
+# toaddr $NETMASKNUM NETMASK
+#
 # @arg $1 number returned by tonum
 # @arg $2 variable to set the result to
+#
 # @stdout Returns a valid network address
 function toaddr () {
     b1=$(( ($1 & 0xFF000000) >> 24))
