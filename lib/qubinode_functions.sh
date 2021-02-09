@@ -1,20 +1,26 @@
 #!/bin/bash
 
-## This contains the majority of the functions required to
-## get the system to a state where ansible and python is available
+# @file qubinode_functions
+# @brief A library of bash functions for getting the kvm host ready for ansible.
+# @description
+#  This contains the majority of the functions required to
+#  get the system to a state where ansible and python is available.
+
 
 ##---------------------------------------------------------------------
 ## Functions for setting up sudoers
 ##---------------------------------------------------------------------
-
-## returns zero/true if root user
+#@description
+# Check if the current user is root.
+# @exitcode 0 if root user
 function is_root () {
     return $(id -u)
 }
 
-# validates that the argument options are valid
-# e.g. if script -s-p pass, it won't use '-' as
-# an argument for -s
+#@description
+# Validates that the argument options are valid, for example.
+# If the agruments -s-p where pass to the installer. The '-' between s and p
+# will not be use as a value of s. 
 function check_args () {
     if [[ $OPTARG =~ ^-[p/c/h/d/a/v/m]$ ]]
     then
@@ -23,16 +29,20 @@ function check_args () {
     fi
 }
 
-function run_su_cmd()
-{
+#@description
+# Executes 'su -c <cmd>'
+# @exitcode 0 if successful
+function run_su_cmd() {
     # this fucntion is used with setup_sudoers
     local cmd=$@
     su -c "$cmd"
     return $?
 }
 
-function setup_sudoers () 
-{
+#@description
+# Adds the current user to sudoers and make it password-less access.
+# If this is unsuccessful it will cause the qubinode-installer to exit.
+function setup_sudoers () {
    local __admin_pass="$1"
    local TMP_RESULT=$(mktemp)
    local TMP_RESULT2=$(mktemp)
@@ -105,8 +115,9 @@ function setup_sudoers ()
 ##---------------------------------------------------------------------
 ## Get Storage Information
 ##---------------------------------------------------------------------
-function getPrimaryDisk () 
-{
+# @description
+# Trys to determine which disk device is assosiated with the root mount /.
+function getPrimaryDisk () {
     primary_disk="${PRIMARY_DISK:-none}"
     if [ "A${primary_disk}" == "Anone" ]
     then
@@ -132,10 +143,16 @@ function getPrimaryDisk ()
 
 
 ## Came across this Gist that provides the functions tonum and toaddr
-## # https://gist.githubusercontent.com/cskeeters/278cb27367fbaa21b3f2957a39087abf/raw/9cb338b28d041092391acd78e451a45d31a1917e/broadcast_calc.sh
-
-function toaddr () 
-{
+## https://gist.githubusercontent.com/cskeeters/278cb27367fbaa21b3f2957a39087abf/raw/9cb338b28d041092391acd78e451a45d31a1917e/broadcast_calc.sh
+# @description
+#   Takes the output from the function tonum and converts it to a network address
+#   then setting the result as a varible.
+# @example
+#    toaddr $NETMASKNUM NETMASK
+# @arg $1 number returned by tonum
+# @arg $2 variable to set the result to
+# @stdout Returns a valid network address
+function toaddr () {
     b1=$(( ($1 & 0xFF000000) >> 24))
     b2=$(( ($1 & 0xFF0000) >> 16))
     b3=$(( ($1 & 0xFF00) >> 8))
@@ -146,19 +163,26 @@ function toaddr ()
     eval "$2=\$b1.\$b2.\$b3.\$b4"
 }
 
-function tonum () 
-{
+# @description
+#   Performs bitwise operation on each octet by it's host bit lenght adding each
+#   result for the total. 
+# @arg $1 the ip address or netmask
+# @arg $2 the variable to store the result it   
+# @example
+#   tonum $IPADDR IPADDRNUM
+#   tonum $NETMASK NETMASKNUM
+# @stdout The bitwise number for the specefied network info
+tonum() {
     if [[ $1 =~ ([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+) ]]; then
-	# shellcheck disable=SC2034 #addr var is valid
-        #addr=$(( (${BASH_REMATCH[1]} << 24) + (${BASH_REMATCH[2]} << 16) + (${BASH_REMATCH[3]} << 8) + ${BASH_REMATCH[4]} ))
-        addr=$(( BASH_REMATCH[1] << 24 + BASH_REMATCH[2] << 16 + BASH_REMATCH[3] << 8 + BASH_REMATCH[4] ))
+        # shellcheck disable=SC2034 #addr var is valid
+        addr=$(( (${BASH_REMATCH[1]} << 24) + (${BASH_REMATCH[2]} << 16) + (${BASH_REMATCH[3]} << 8) + ${BASH_REMATCH[4]} ))
         eval "$2=\$addr"
     fi
 }
 
-
-function return_netmask_ipaddr ()
-{
+# @description
+#  Calculates network and broadcast based on supplied ip address and netmask
+function return_netmask_ipaddr () {
     if [[ $1 =~ ^([0-9\.]+)/([0-9]+)$ ]]; then
         # CIDR notation
         IPADDR=${BASH_REMATCH[1]}
@@ -171,14 +195,31 @@ function return_netmask_ipaddr ()
         NETMASKNUM=$((NETMASKNUM ^ 0xFFFFFFFF))
         toaddr $NETMASKNUM NETMASK
     else
-        IPADDR=${1:-192.168.1.1}
-        NETMASK=${2:-255.255.255.0}
+        if [ "A${1}" == "A" ]
+        then
+            echo "No ip address info found."
+            echo "Could not determine your primary network interface"
+            echo "ip address and netamsk"
+            exit 1
+        fi
+   
+        IPADDR=${1}
+        NETMASK=${2}
     fi
 
+    # Split the ip address in the format of ip/cidr_mas or ip/netmask
     tonum "$IPADDR" IPADDRNUM
     tonum "$NETMASK" NETMASKNUM
+
+    INVNETMASKNUM=$(( 0xFFFFFFFF ^ NETMASKNUM ))
     NETWORKNUM=$(( IPADDRNUM & NETMASKNUM ))
+    BROADCASTNUM=$(( INVNETMASKNUM | NETWORKNUM ))
+
+    # Return the ip address/mask network
     toaddr "$NETWORKNUM" NETWORK
+
+    # Return the ip address/mask broadcast
+    toaddr $BROADCASTNUM BROADCAST
 }
 
 ##---------------------------------------------------------------------
