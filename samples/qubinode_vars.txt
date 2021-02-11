@@ -1,3 +1,8 @@
+## Set these vars to yes to force the installer to run these checks
+CONFIRM_USER_DOMAIN="${confirmed_user_domain:-yes}"
+CONFIRM_NETWORKING="${confirm_networking:-yes}"
+CONFIRM_LIBVIRT_NETWORK="${confirm_libvirt_network:-yes}"
+
 ## none root user
 QUBINODE_ADMIN_USER="${CURRENT_USER}"
 
@@ -36,7 +41,7 @@ DOMAIN="${domain:-$generated_domain}"
 ##---------------------------------------------------------------------
 IDM_HOSTNAME_PREFIX="${idm_hostname_prefix:-idm01}"
 DEPLOY_IDM="${DEPLOY_IDM:-yes}"
-IDM_SERVER_HOSTNAME="${idm_server_hostname:-$generated_idm_hostname}"
+IDM_SERVER_HOSTNAME="${idm_server_hostname:-none}"
 IDM_ADMIN_USER="${idm_admin_user:-admin}"
 IDM_SERVER_IP="${idm_server_ip:-none}"
 ALLOW_ZONE_OVERLAP="${allow_zone_overlap:-none}"
@@ -45,8 +50,8 @@ IDM_DEPLOY_METHOD="${idm_deploy_method:-none}"
 ##---------------------------------------------------------------------
 ## Libvirt variables
 ##---------------------------------------------------------------------
-PRIMARY_DISK="${primary_disk}"
-LIBVIRT_DIR="${LIBVIRT_DIR}"
+PRIMARY_DISK="${primary_disk-none}"
+LIBVIRT_DIR="${LIBVIRT_DIR-none}"
 LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK-none}"
 CREATE_LIBVIRT_STORAGE="${create_libvirt_lvm:-none}"
 LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
@@ -61,22 +66,26 @@ SYSTEM_REGISTERED="${SYSTEM_REGISTERED:-no}"
 RHSM_REG_METHOD="${RHSM_REG_METHOD:-none}"
 
 ##---------------------------------------------------------------------
+## Varibles for ansible role qubinode_kvmhost_setup
+##---------------------------------------------------------------------
+KVM_HOST_IP="${IPADDRESS}"
+
+##---------------------------------------------------------------------
 ## Only edit below if you know what you are doing
 ##---------------------------------------------------------------------
-ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED}"
-PYTHON3_INSTALLED="${PYTHON3_INSTALLED}"
-ALL_DISK="${ALL_DISK}"
-ALL_INTERFACES="${ALL_INTERFACES}"
-OS_NAME=${os_name}
-VAULT_FILE="${VAULT_FILE}"
-CONFIRM_NETWORKING="${confirm_networking:-yes}"
-QUBINODE_ANSIBLE_VARS="${QUBINODE_ANSIBLE_VARS}"
+ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-none}"
+PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-none}"
+ALL_DISK="${ALL_DISK:-none}"
+ALL_INTERFACES="${ALL_INTERFACES:-none}"
+OS_NAME=${os_name:-none}
+VAULT_FILE="${VAULT_FILE:-none}"
+
+QUBINODE_ANSIBLE_VARS="${QUBINODE_ANSIBLE_VARS:-none}"
 YUM_PACKAGES="python3-pyyaml python36 python3-pip python3-dns ansible git podman python-podman-api toolbox ipcalc"
 PIP_PACKAGES="yml2json"
 RHEL8_REPOS="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
 LIBVIRT_DIR_VERIFY="${libvirt_dir_verify:-none}"
-CONFIRMED_USER_DOMAIN="${confirmed_user_domain:-yes}"
 IDM_EXISTING_ADMIN_USER="${idm_admin_existing_user:-none}"
 USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP:-yes}"
 DOMAIN_TLD="${DOMAIN_TLD:-lab.qubinode.io}"
-CONFIRM_LIBVIRT_NETWORK="${confirm_libvirt_network:-yes}"
+QUBINODE_BASELINE_COMPLETE="${qubinode_baseline_complete:-no}"

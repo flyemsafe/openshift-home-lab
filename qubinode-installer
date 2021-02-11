@@ -59,10 +59,11 @@ QUBINODE_BASH_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.txt"
 QUBINODE_ANSIBLE_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.yml"
 # shellcheck disable=SC2034  # called when vault file is generated
 RANDOM_GENERATED_PASS=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 8)
-ANSIBLE_REQUIREMENTS_FILE="${project_dir}/playbooks/requirements.yml"
+export ANSIBLE_REQUIREMENTS_FILE="${project_dir}/playbooks/requirements.yml"
 QUBINODE_INVENTORY_DIR="${project_dir}/inventory"
 QUBINODE_INVENTORY_FILE="${QUBINODE_INVENTORY_DIR}/hosts"
 QUBINODE_INVENTORY_SAMPLE_FILE="${project_dir}/samples/hosts"
+
 
 ## Load existing vars
 if [ -f "$QUBINODE_BASH_VARS" ]
@@ -107,11 +108,16 @@ fi
 ## this function ensure the system is ready for ansible and python
 ## in addition it collects all the required information required
 function qubinode_baseline () {
+    ## vars to track with function run has completed
+    declare -a BASELINE_STATUS=()
+    BASELINE_STATUS+=(initiate)
+    export qubinode_baseline_complete=no
+
     ## get the password for the admin user   
     ask_for_admin_user_pass
 
     ## check sudoers status
-    setup_sudoers "$admin_user_password"
+    setup_sudoers "${admin_user_password:-none}"
 
     ## Check system registration status
     ask_user_for_rhsm_credentials
@@ -136,6 +142,12 @@ function qubinode_baseline () {
 
     ## Get main network interface details
     get_primary_interface
+
+    ## Set baseline run to complete
+    if [ "${#BASELINE_STATUS[@]}" -eq 9 ]
+    then
+        export qubinode_baseline_complete=yes
+    fi
 }
 
 ## this function generates the required vars file
@@ -144,6 +156,7 @@ function qubinode_vars () {
     TMP_BASH_VARS_FILE=$(mktemp)
     CURRENT_BASH_VARS_FILE=$(mktemp)
     
+    # Default gen file
     ## make a copy of the current bash vars file
     if [ -f "$QUBINODE_BASH_VARS" ]
     then
@@ -229,6 +242,7 @@ function main ()
     fi
 
     qubinode_product=false
+    local product_options=("")
     NUM_ARGS="$#"
     ALL_ARGS="$@"
     while getopts ":c:dvhm:p:a:" opt;

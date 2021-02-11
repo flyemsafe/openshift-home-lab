@@ -44,6 +44,11 @@ function run_su_cmd() {
 # If this is unsuccessful it will cause the qubinode-installer to exit.
 function setup_sudoers () {
    local __admin_pass="$1"
+   if [ "A${__admin_pass}" == "Anone" ]
+   then
+       echo "Current user password is required."
+       exit 1
+   fi
    local TMP_RESULT=$(mktemp)
    local TMP_RESULT2=$(mktemp)
    local HAS_SUDO="none"
@@ -109,6 +114,8 @@ function setup_sudoers () {
        printf "   ${red:?}Error: Sudo setup was unsuccesful${end:?}"
        exit
    fi
+   setup_sudoers_status="sudoers_done"
+   BASELINE_STATUS+=("$setup_sudoers_status")
 }
 
 
@@ -256,6 +263,7 @@ function get_primary_interface () {
     netmask="${HOST_NETMASK:-none}"
     reverse_zone="${REVERSE_ZONE:-none}"
     confirm_networking="${CONFIRM_NETWORKING:-yes}"
+    confirm_libvirt_network="${CONFIRM_LIBVIRT_NETWORK:-yes}"
 
     ## Get all interfaces except wireless and bridge
     declare -a INTERFACES=()
@@ -313,11 +321,20 @@ function get_primary_interface () {
         macaddr=$(ip addr show "$netdevice" | grep link | awk '{print $2}' | head -1)
     fi
 
-    ## Verify networking
-    if [ "A${confirm_networking}" == "Ayes" ]
+    ## Libvirt Network
+    if [ "A${confirm_libvirt_network}" == "Ayes" ]
     then
         libvirt_network_info
     fi
+
+    ## Verify network interface details
+    if [ "A${confirm_networking}" == "Ayes" ]
+    then
+        verify_networking_info
+    fi
+
+    get_primary_interface_status="interface_done"
+    BASELINE_STATUS+=("$get_primary_interface_status")
 }
 
 # @description
@@ -329,7 +346,7 @@ function libvirt_network_info () {
     ## defaults
     libvirt_network_name="${libvirt_network_name:-default}"
     libvirt_bridge_name="${libvirt_bridge_name:-qubibr0}"
-    create_libvirt_bridge="${create_libvirt_bridge:-yes}"
+    create_libvirt_bridge="${CREATE_LIBVIRT_BRIDGE:-yes}"
     confirm_libvirt_network="${CONFIRM_LIBVIRT_NETWORK:-yes}"
 
     local libvirt_net_choices
@@ -340,6 +357,7 @@ function libvirt_network_info () {
     IFS=" " read -r -a libvirt_net_choices <<< "$libvirt_net_selections"
     libvirt_net_msg=" Would you like to ${cyn:?}skip${end:?} or ${cyn:?}continue${end:?} the bridge network setup or ${cyn:?}specify${end:?} a libvirt network to use?"
 
+    echo "confirm_libvirt_network=$confirm_libvirt_network"
     if [ "${confirm_libvirt_network}" == 'yes' ]
     then
         printf "%s\n\n" ""
@@ -367,15 +385,15 @@ function libvirt_network_info () {
         elif [ "A${libvirt_net_choice}" == "ASkip" ]
         then
             create_libvirt_bridge=no
-            confirm_libvirt_network=no
             printf "%s\n" "  Using the libvirt nat network called: ${cyn:?}${libvirt_network_name}${end:?}."
+            confirm_libvirt_network=no
         else
-            if [ "A${create_libvirt_bridge}" == "Ayes" ]
-            then
-                verify_networking_info
-            fi 
+            export create_libvirt_bridge="yes"
+            
+            confirm_libvirt_network=no
         fi
     fi
+    verify_networking_info
 }
 
 # @description
@@ -391,7 +409,7 @@ function verify_networking_info () {
     printf "%s\n" "  ${blu:?}NETWORK${end:?}=${cyn:?}${network:?}${end:?}"
     printf "%s\n\n" "  ${blu:?}MACADDR${end:?}=${cyn:?}${macaddr:?}${end:?}"
 
-    confirm "  Would you like to change these details? ${cyn:?}yes/no${end:?}"
+    confirm "  Do you want to change any of the above? ${cyn:?}yes/no${end:?}"
     if [ "A${response}" == "Ayes" ]
     then
         printf "%s\n\n" "  ${blu:?}Choose a attribute to change: ${end:?}"
@@ -460,19 +478,22 @@ function verify_networking_info () {
 # * os_name
 #
 function pre_os_check() {
-    # shellcheck disable=SC2034
-    rhel_release=$(< /etc/redhat-release grep -o "[7-8].[0-9]")
-    # shellcheck disable=SC2034
-    rhel_major=$(sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release)
-    os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
-    RHSM_SYSTEM=no
-
-    ## setup vars for export
-    rhsm_system="$RHSM_SYSTEM"
-    export RHEL_RELEASE="$rhel_release"
-    export RHEL_MAJOR="$rhel_major"
-    export OS_NAME="$os_name"
-    export RHSM_SYSTEM="$RHSM_SYSTEM"
+    if grep -q 'Red Hat Enterprise Linux' /etc/redhat-release
+    then
+        # shellcheck disable=SC2034
+        rhel_release=$(< /etc/redhat-release grep -o "[7-8].[0-9]")
+        # shellcheck disable=SC2034
+        rhel_major=$(sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release)
+        os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
+        RHSM_SYSTEM=yes
+    
+        ## setup vars for export
+        rhsm_system="$RHSM_SYSTEM"
+        export RHEL_RELEASE="$rhel_release"
+        export RHEL_MAJOR="$rhel_major"
+        export OS_NAME="$os_name"
+        export RHSM_SYSTEM="$RHSM_SYSTEM"
+    fi
 }
 
 # @description
@@ -590,6 +611,8 @@ function register_system () {
 	    exit 1
         fi
     fi
+    register_system_status="register_done"
+    BASELINE_STATUS+=("$register_system_status")
 }
 
 
@@ -790,8 +813,7 @@ function rhsm_get_reg_method () {
     printf "%s\n" "  The goal of the qubinode-installer is to automate the installation of"
     printf "%s\n" "  supported Red Hat products. To provide this experience we ask for a method"
     printf "%s\n" "  to register your Red Hat product and current system to the Red Hat Customer"
-    printf "%s\n" "  portal."
-
+    printf "%s\n\n" "  portal."
     printf "%s\n" "  You can skip this step if your system is already registered and you are not"
     printf "%s\n\n" "  interested in using the installer to deploy any Red Hat product."
     confirm "  Continue with providing a method to register to Red Hat? ${blu:?}yes/no${end:?}"
@@ -1003,6 +1025,8 @@ function check_additional_storage () {
             create_libvirt_lvm="$CREATE_LIBVIRT_STORAGE"
         fi
     fi
+    check_additional_storage_status="storage_done"
+    BASELINE_STATUS+=("$check_additional_storage_status")
 }
 
 # @description
@@ -1037,7 +1061,7 @@ function ask_about_domain() {
     domain_tld="${DOMAIN_TLD:-lan}"
     generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
     domain="${DOMAIN:-$generated_domain}"
-    confirmed_user_domain="${CONFIRMED_USER_DOMAIN:-yes}"
+    confirmed_user_domain="${CONFIRM_USER_DOMAIN:-yes}"
     confirmation_question=null
     idm_deploy_method="${IDM_DEPLOY_METHOD:-none}"
 
@@ -1051,14 +1075,14 @@ function ask_about_domain() {
         then
             confirmation_question="Enter your existing IdM server domain, e.g. example.com"
         else
-            printf "%s\n" "   The domain ${cyn:?}${generated_domain}${end:?} was generated for you."
-            confirm "   Do you want to change it? ${blu:?}yes/no${end:?}"
+            printf "%s\n" "  The domain ${cyn:?}${generated_domain}${end:?} was generated for you."
+            confirm "  Do you want to change it? ${blu:?}yes/no${end:?}"
             if [ "A${response}" == "Ayes" ]
             then
                 confirmation_question="Enter your domain name"
-	    else
-		confirmed_user_domain=no
-	    fi
+	        else
+		        confirmed_user_domain=no
+	        fi
         fi
 
         ## Ask user to confirm domain
@@ -1067,12 +1091,14 @@ function ask_about_domain() {
             confirm_correct "${confirmation_question}" USER_DOMAIN
             if [ "A${USER_DOMAIN}" != "A" ]
             then
-	        domain="$USER_DOMAIN"
-		confirmed_user_domain=no
+	          domain="$USER_DOMAIN"
+		      confirmed_user_domain=no
             fi
         fi
 	
     fi
+    ask_about_domain_status="domain_done"
+    BASELINE_STATUS+=("$ask_about_domain_status")
 }
 
 # @description
@@ -1179,6 +1205,9 @@ function ask_about_idm () {
 		;;
 	esac
     fi
+
+    ask_about_idm_status="idm_done"
+    BASELINE_STATUS+=("$ask_about_idm_status")
 }
 
 # @description
@@ -1335,7 +1364,7 @@ function install_packages () {
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
         for pkg in $pip_packages
         do
-            if ! pip3 list --format=legacy| grep "$pkg" > /dev/null 2>&1
+            if ! pip3 list --format=columns| grep "$pkg" > /dev/null 2>&1
             then
                 printf "%s\n" "  ${cyn:?}Installing $pkg${end:?}"
                 if ! /usr/bin/pip3 install "$pkg" --user > /dev/null 2>&1
@@ -1347,6 +1376,8 @@ function install_packages () {
         done
         printf "%s\n" "  ${yel:?}All pip packages are present${end:?}"
     fi
+    install_packages_status="package_done"
+    BASELINE_STATUS+=("$install_packages_status")
 }
 
 # @description
@@ -1395,7 +1426,74 @@ function qubinode_setup_ansible ()
 	        exit 1
 	    fi
     fi
+    qubinode_setup_ansible_status="ansible_done"
+    BASELINE_STATUS+=("$qubinode_setup_ansible_status")
 }
+
+##---------------------------------------------------------------------
+##  Qubinode utility functions
+##---------------------------------------------------------------------
+# @description
+# Reset project folder to default state by removing all var files
+# from playbooks/vars. A backup of each var is stored under the backup
+# directory.
+function qubinode_project_cleanup () {
+    test -d "${project_dir}/backup" || mkdir -p "${project_dir}"/backup/{vars,inventory}
+    FILES=()
+    timestamp=$(date -d "today" +"%Y%m%d%H%M")
+    mapfile -t FILES < <(find "${project_dir}/inventory/" -not -path '*/\.*' -type f)
+    mapfile -t FILES < <(find "${project_dir}/playbooks/vars/" -not -path '*/\.*' -type f)
+    if [ ${#FILES[@]} -ne 0 ]
+    then
+        for f in "${FILES[@]}"
+        do
+            f_name=$(basename "$f")
+            new_name="${f_name}.${timestamp}"
+            if echo "$f"|grep -q inventory
+            then 
+                mv "$f" "${project_dir}/backup/inventory/${new_name}"
+            fi
+
+            if echo "$f"| grep -q vars
+            then
+                mv "$f" "${project_dir}/backup/vars/${new_name}"
+            fi
+        done
+    fi
+}
+
+# @description
+# Collect information about the kvm host hardware
+function create_qubinode_profile_log () {
+    if [[ ! -f "${project_dir}/qubinode_profile.log" ]]; then
+        rm -rf "${project_dir}/qubinode_profile.log"
+        collect_system_information
+cat >"${project_dir}/qubinode_profile.log"<<EOF
+Manufacturer: ${MANUFACTURER}
+Product Name: ${PRODUCTNAME}
+
+System Memory
+*************
+Avaliable Memory: ${AVAILABLE_MEMORY}
+Avaliable Human Memory: ${AVAILABLE_HUMAN_MEMORY}
+
+Storage Information
+*******************
+Avaliable Storage: ${AVAILABLE_STORAGE}
+Avaliable Human Storage: ${AVAILABLE_HUMAN_STORAGE}
+
+CPU INFO
+***************
+$(lscpu | egrep 'Model name|Socket|Thread|NUMA|CPU\(s\)')
+EOF
+
+    fi
+
+    echo "SYSTEM REPORT"
+    cat "${project_dir}/qubinode_profile.log"
+}
+
+
 
 ##---------------------------------------------------------------------
 ##  MENU OPTIONS
@@ -1407,7 +1505,7 @@ function display_help() {
     if [ ! -d "$project_dir" ]
     then
         printf "%s\n" "   ${red:?}Error: could not locate ${project_dir}${end:?}" 
-	exit 1
+	    exit 1
     fi
     cat < "${project_dir}/docs/qubinode/qubinode-menu-options.adoc"
 }
@@ -1415,19 +1513,30 @@ function display_help() {
 # @description
 # The qubinode-installer -m options.
 function qubinode_maintenance_options () {
-    if [ "${qubinode_maintenance_opt}" == "clean" ]
+    local options="${product_options[*]:?}"      
+    if [ "A${options}" != "A" ]
     then
-        qubinode_project_cleanup
-    elif [ "${qubinode_maintenance_opt}" == "hwp" ]
-    then
-        # Collect hardware information
-        create_qubinode_profile_log
-    elif [ "${qubinode_maintenance_opt}" == "setup" ]
+        _product_options_file=$(mktemp)
+        for var_name in "${product_options[@]}"
+        do
+            echo "$var_name" >> "${_product_options_file}"
+        done
+        # shellcheck source=/dev/null
+        # shellcheck disable=SC1091
+        source "${_product_options_file}"
+    else 
+        local tags=""
+    fi
+
+    if [ "${qubinode_maintenance_opt}" == "setup" ]
     then
         printf "%s\n" "  ${blu:?}Running Qubinode Setup${end:?}"
         qubinode_baseline
         qubinode_vars
         qubinode_vault_file
+    elif [ "${qubinode_maintenance_opt}" == "clean" ]
+    then
+        qubinode_project_cleanup
     elif [ "${qubinode_maintenance_opt}" == "rhsm" ]
     then
         ## Check system registration status
@@ -1438,48 +1547,66 @@ function qubinode_maintenance_options () {
         qubinode_vault_file
     elif [ "${qubinode_maintenance_opt}" == "ansible" ]
     then
-        qubinode_setup_ansible
+        if [ "A${SYSTEM_REGISTERED}" != "Ayes" ]
+        then
+            echo "Please run ./qubinode-installer -m rhsm first"
+            exit 1
+        else
+            qubinode_setup_ansible
+            qubinode_vars
+            qubinode_vault_file
+        fi
     elif [ "${qubinode_maintenance_opt}" == "network" ]
     then
         get_primary_interface
         qubinode_vars
     elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
     then
-        local kvmhost_vars=playbooks/vars/kvm_host.yml
-        local inventory=inventory/hosts
-	local options="${product_options[@]:-none}"
-	local ansible_cmd
-	local tags=$(echo "$options" | sed 's/ /,/g' )
-        cd "${project_dir}"
-        test -f "${kvmhost_vars}" || cp samples/kvm_host.yml "${kvmhost_vars}"
-        test -f "${inventory}" || cp samples/hosts "${inventory}"
+	    local ansible_cmd
+        local kvmhost_vars="${project_dir}/playbooks/vars/kvm_host.yml"
+        local inventory="${project_dir}/inventory/hosts"
 
-        if [ "${options}" != "none" ]
+        if [ "A${tags}" != "A" ]
         then
-	    ansible_cmd="ansible-playbook playbooks/kvmhost.yml --tags $tags"
-	else
-	    ansible_cmd="ansible-playbook playbooks/kvmhost.yml"
-	fi
+            ansible_cmd="ansible-playbook ${project_dir}/playbooks/kvmhost.yml --tags $tags"
+        else
+            ansible_cmd="ansible-playbook ${project_dir}/playbooks/kvmhost.yml"
+        fi
 
-	if [ -f "${inventory}" ] && [ -f "${kvmhost_vars}" ]
+        if ! cd "${project_dir}"
+        then 
+            printf "%s\n" "  Error: ${red:?}Could not enter ${project_dir} ${end:?}"
+            exit 1
+        fi
+        test -f "${kvmhost_vars}" || cp "${project_dir}/samples/kvm_host.yml" "${kvmhost_vars}"
+        test -f "${inventory}" || cp "${project_dir}/samples/hosts" "${inventory}"
+
+
+	    if [ -f "${inventory}" ] && [ -f "${kvmhost_vars}" ]
         then
             printf "%s\n" "  ${blu:?}Running Qubinode KVMHOST setup${end:?}"
-	    echo "${ansible_cmd}"|sh
+            qubinode_vars
+            qubinode_vault_file
+	        echo "${ansible_cmd}"|sh
         else
             printf "%s\n" "  Error: ${red:?}Could locate ${kvmhost_vars} and ${inventory} ${end:?}"
         fi
-    elif [ "${qubinode_maintenance_opt}" == "rebuild_qubinode" ]
-    then
-        rebuild_qubinode
-    elif [ "${qubinode_maintenance_opt}" == "undeploy" ]
-    then
-        #TODO: this should remove all VMs and clean up the project folder
-        qubinode_vm_manager undeploy
-    elif [ "${qubinode_maintenance_opt}" == "uninstall_openshift" ]
-    then
-      #TODO: this should remove all VMs and clean up the project folder
-        qubinode_uninstall_openshift
-    else
-        display_help
+#    elif [ "${qubinode_maintenance_opt}" == "hwp" ]
+#    then
+        # Collect hardware information
+#        create_qubinode_profile_log
+#    elif [ "${qubinode_maintenance_opt}" == "rebuild_qubinode" ]
+#    then
+#        rebuild_qubinode
+#    elif [ "${qubinode_maintenance_opt}" == "undeploy" ]
+#    then
+#        #TODO: this should remove all VMs and clean up the project folder
+#        qubinode_vm_manager undeploy
+#    elif [ "${qubinode_maintenance_opt}" == "uninstall_openshift" ]
+#    then
+#      #TODO: this should remove all VMs and clean up the project folder
+#        qubinode_uninstall_openshift
+#    else
+#        display_help
     fi
 }
