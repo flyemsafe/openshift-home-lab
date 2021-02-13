@@ -1,7 +1,7 @@
 ## Set these vars to yes to force the installer to run these checks
-CONFIRM_USER_DOMAIN="${confirmed_user_domain:-yes}"
-CONFIRM_NETWORKING="${confirm_networking:-yes}"
-CONFIRM_LIBVIRT_NETWORK="${confirm_libvirt_network:-yes}"
+CONFIRM_USER_DOMAIN="${CONFIRM_USER_DOMAIN:-yes}"
+CONFIRM_NETWORKING="${CONFIRM_NETWORKING:-yes}"
+CONFIRM_LIBVIRT_NETWORK="${CONFIRM_LIBVIRT_NETWORK:-yes}"
 
 ## none root user
 QUBINODE_ADMIN_USER="${CURRENT_USER}"
@@ -9,50 +9,48 @@ QUBINODE_ADMIN_USER="${CURRENT_USER}"
 ## all vms will be prefix with this name
 NAME_PREFIX="${NAME_PREFIX:-$name_prefix}"
 
-## Qubinode project folder
-QUBINODE_PROJECT_DIR="${project_dir:-none}"
 
 ##---------------------------------------------------------------------
 ## Variables for bridge network interface / set to override installer
 ##---------------------------------------------------------------------
 
 ## Required for bridge networking
-CREATE_LIBVIRT_BRIDGE="${create_libvirt_bridge:-no}"
-LIBVIRT_NETWORK_NAME="${libvirt_network_name:-default}"
-LIBVIRT_BRIDGE_NAME="${libvirt_bridge_name:-qubibr0}"
+CREATE_LIBVIRT_BRIDGE="${CREATE_LIBVIRT_BRIDGE:-no}"
+LIBVIRT_NETWORK_NAME="${LIBVIRT_NETWORK_NAME:-default}"
+LIBVIRT_BRIDGE_NAME="${LIBVIRT_BRIDGE_NAME:-qubibr0}"
 
-NETWORK_DEVICE="${netdevice:-none}"
-IPADDRESS="${ipaddress:-none}"
-GATEWAY="${gateway:-none}"
-NETMASK="${netmask:-none}"
+NETWORK_DEVICE="${NETWORK_DEVICE:-none}"
+IPADDRESS="${IPADDRESS:-none}"
+GATEWAY="${GATEWAY:-none}"
+NETMASK="${NETMASK:-none}"
 
 ## optional
-MACADDR="${macaddr:-none}"
-NETWORK="${network:-none}"
+MACADDR="${MACADDR:-none}"
+NETWORK="${NETWORK:-none}"
 
 ##---------------------------------------------------------------------
 ## Varibles for DNS server
 ##---------------------------------------------------------------------
-REVERSE_ZONE="${reverse_zone:-none}"
-DOMAIN="${domain:-$generated_domain}"
+REVERSE_ZONE="${REVERSE_ZONE:-none}"
+DOMAIN="${DOMAIN:-$generated_domain}"
 
 ##---------------------------------------------------------------------
 ## Varibles for IdM server
 ##---------------------------------------------------------------------
-IDM_HOSTNAME_PREFIX="${idm_hostname_prefix:-idm01}"
+IDM_HOSTNAME_PREFIX="${IDM_HOSTNAME_PREFIX:-idm01}"
 DEPLOY_IDM="${DEPLOY_IDM:-yes}"
-IDM_SERVER_HOSTNAME="${idm_server_hostname:-none}"
-IDM_ADMIN_USER="${idm_admin_user:-admin}"
-IDM_SERVER_IP="${idm_server_ip:-none}"
-ALLOW_ZONE_OVERLAP="${allow_zone_overlap:-none}"
-IDM_DEPLOY_METHOD="${idm_deploy_method:-none}"
+IDM_SERVER_HOSTNAME="${IDM_SERVER_HOSTNAME:-none}"
+IDM_ADMIN_USER="${IDM_ADMIN_USER:-admin}"
+IDM_SERVER_IP="${IDM_SERVER_IP:-none}"
+ALLOW_ZONE_OVERLAP="${ALLOW_ZONE_OVERLAP:-none}"
+IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD:-none}"
 
 ##---------------------------------------------------------------------
 ## Libvirt variables
 ##---------------------------------------------------------------------
-PRIMARY_DISK="${primary_disk-none}"
-LIBVIRT_DIR="${LIBVIRT_DIR-none}"
-LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK-none}"
+PRIMARY_DISK="${PRIMARY_DISK:-none}"
+LIBVIRT_DIR="${LIBVIRT_DIR:-none}"
+LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK:-none}"
 CREATE_LIBVIRT_STORAGE="${create_libvirt_lvm:-none}"
 LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
 
@@ -60,24 +58,49 @@ LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
 ## Varibles for RHSM
 ##---------------------------------------------------------------------
 RHSM_SYSTEM="${RHSM_SYSTEM:-no}"
-RHEL_RELEASE="${rhel_release:-none}"
-RHEL_MAJOR="${rhel_major:-none}"
+RHEL_RELEASE="${RHEL_RELEASE:-none}"
+RHEL_MAJOR="${RHEL_MAJOR:-none}"
 SYSTEM_REGISTERED="${SYSTEM_REGISTERED:-no}"
 RHSM_REG_METHOD="${RHSM_REG_METHOD:-none}"
 
 ##---------------------------------------------------------------------
 ## Varibles for ansible role qubinode_kvmhost_setup
-##---------------------------------------------------------------------
+##------------------------------------------------q---------------------
 KVM_HOST_IP="${IPADDRESS}"
+KVM_HOST_GW="${GATEWAY}"
+KVM_HOST_INTERFACE="${NETWORK_DEVICE}"
+KVM_HOST_MACADDR="${MACADDR}"
+KVM_HOST_NETMASK="${NETMASK}"
+KVM_HOST_MTU="${MTU-1500}"
+
+KVM_HOST_LIBVIRT_EXTRA_DISK="${LIBVIRT_POOL_DISK}"
+KVM_HOST_LIBVIRT_DIR="{LIBVIRT_DIR}"
+
+KVM_HOST_MASK_PREFIX=""
+LIBVIRT_POOL_NAME_CHECK="yes"
+SKIP_LIBVIRT_POOL="yes"
+RUN_STORAGE_CHECK="yes"
+QUBINODE_INSTALLER_HOST_COMPLETED="yes"
+RUN_QUBINODE_SETUP="yes"
+
+#kvm_host_mask_prefix=""
+#libvirt_pool_name_check: yes
+#skip_libvirt_pool=no
+#run_storage_check=""
+#qubinode_installer_host_completed: no
+#run_qubinode_setup: yes
 
 ##---------------------------------------------------------------------
 ## Only edit below if you know what you are doing
 ##---------------------------------------------------------------------
+## Qubinode project folder
+QUBINODE_PROJECT_DIR="${project_dir:-none}"
+
 ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-none}"
 PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-none}"
 ALL_DISK="${ALL_DISK:-none}"
 ALL_INTERFACES="${ALL_INTERFACES:-none}"
-OS_NAME=${os_name:-none}
+OS_NAME=${OS_NAME:-none}
 VAULT_FILE="${VAULT_FILE:-none}"
 
 QUBINODE_ANSIBLE_VARS="${QUBINODE_ANSIBLE_VARS:-none}"
@@ -88,4 +111,4 @@ LIBVIRT_DIR_VERIFY="${libvirt_dir_verify:-none}"
 IDM_EXISTING_ADMIN_USER="${idm_admin_existing_user:-none}"
 USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP:-yes}"
 DOMAIN_TLD="${DOMAIN_TLD:-lab.qubinode.io}"
-QUBINODE_BASELINE_COMPLETE="${qubinode_baseline_complete:-no}"
+QUBINODE_BASELINE_COMPLETE="${QUBINODE_BASELINE_COMPLETE:-no}"

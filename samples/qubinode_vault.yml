@@ -11,7 +11,7 @@ rhsm_org: ${RHSM_ORG:-none}
 rhsm_activationkey: ${RHSM_ACTKEY:-none}
 
 ## admin or current user password
-admin_user_password: ${admin_user_password:-none}
+admin_user_password: ${ADMIN_USER_PASSWORD:-none}
 
 ## Idm Server
 idm_dm_pwd: ${IDM_DM_PASS:-$RANDOM_GENERATED_PASS}

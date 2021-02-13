@@ -111,7 +111,7 @@ function setup_sudoers () {
    echo "$__admin_pass" | sudo -S ls 2> "$TMP_RESULT" 1> /dev/null && HAS_SUDO=yes
    if [ "$HAS_SUDO" == "no" ]
    then
-       printf "   ${red:?}Error: Sudo setup was unsuccesful${end:?}"
+       printf "%s\n" "   ${red:?}Error: Sudo setup was unsuccesful${end:?}"
        exit
    fi
    setup_sudoers_status="sudoers_done"
@@ -146,6 +146,9 @@ function getPrimaryDisk () {
         grep -o '^/dev[^ ]*'|awk -F'/' '{print $3}' | \
         grep -v "${primary_disk}")
     ALL_DISK="${DISKS[*]}"
+
+    ## Export vars for updating qubinode_vars.txt
+    export PRIMARY_DISK="${primary_disk-none}"
 }
 
 
@@ -335,6 +338,17 @@ function get_primary_interface () {
 
     get_primary_interface_status="interface_done"
     BASELINE_STATUS+=("$get_primary_interface_status")
+
+    ## Export vars for updating qubinode_vars.txt
+    export CONFIRM_NETWORKING="${confirm_networking:-yes}"
+    export NETWORK_DEVICE="${netdevice:-none}"
+    export IPADDRESS="${ipaddress:-none}"
+    export GATEWAY="${gateway:-none}"
+    export NETMASK="${netmask:-none}"
+    export MACADDR="${macaddr:-none}"
+    export NETWORK="${network:-none}"
+    export REVERSE_ZONE="${reverse_zone:-none}"
+    export CONFIRM_LIBVIRT_NETWORK="${confirm_libvirt_network:-yes}"
 }
 
 # @description
@@ -344,11 +358,11 @@ function get_primary_interface () {
 function libvirt_network_info () {
 
     ## defaults
-    libvirt_network_name="${libvirt_network_name:-default}"
-    libvirt_bridge_name="${libvirt_bridge_name:-qubibr0}"
+    libvirt_network_name="${LIBVIRT_NETWORK_NAME:-default}"
+    libvirt_bridge_name="${LIBVIRT_BRIDGE_NAME:-qubibr0}"
     create_libvirt_bridge="${CREATE_LIBVIRT_BRIDGE:-yes}"
     confirm_libvirt_network="${CONFIRM_LIBVIRT_NETWORK:-yes}"
-
+        
     local libvirt_net_choices
     local libvirt_net_choice
     local libvirt_net_selections
@@ -394,6 +408,11 @@ function libvirt_network_info () {
         fi
     fi
     verify_networking_info
+
+    ## Export vars for updating qubinode-vars.txt
+    export CREATE_LIBVIRT_BRIDGE="${create_libvirt_bridge:-yes}"
+    export LIBVIRT_NETWORK_NAME="${libvirt_network_name:-default}"
+    export LIBVIRT_BRIDGE_NAME="${libvirt_bridge_name:-qubibr0}"
 }
 
 # @description
@@ -487,7 +506,7 @@ function pre_os_check() {
         os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
         RHSM_SYSTEM=yes
     
-        ## setup vars for export
+        ## Export vars for updating qubinode_vars.txt
         rhsm_system="$RHSM_SYSTEM"
         export RHEL_RELEASE="$rhel_release"
         export RHEL_MAJOR="$rhel_major"
@@ -930,7 +949,7 @@ function ask_user_for_rhsm_credentials () {
 # @description
 # Ask the user for their password.
 function ask_for_admin_user_pass () {
-    admin_user_password="${ADMIN_USER_PASS:-none}"
+    admin_user_password="${ADMIN_USER_PASSWORD:-none}"
     # root user password to be set for virtual instances created
     if [ "A${admin_user_password}" == "Anone" ]
     then
@@ -948,6 +967,7 @@ function ask_for_admin_user_pass () {
         MSG_TWO="Enter a password again for ${cyn:?}${QUBINODE_ADMIN_USER}${end:?} ${blu:?}[ENTER]${end:?}:"
         accept_sensitive_input
         admin_user_password="$sensitive_data"
+        export ADMIN_USER_PASSWORD="${admin_user_password:-none}"
     fi
 }
 
@@ -962,7 +982,7 @@ function check_additional_storage () {
     libvirt_dir="${LIBVIRT_DIR:-/var/lib/libvirt/images}"
     LIBVIRT_DIR="${LIBVIRT_DIR:-$libvirt_dir}"
 
-    libvirt_pool_name="${libvirt_pool_name:-default}"
+    libvirt_pool_name="${LIBVIRT_DIR_POOL_NAME:-default}"
     # confirm directory for libvirt images
     if [ "A${libvirt_dir_verify}" != "Ano" ]
     then
@@ -1027,6 +1047,10 @@ function check_additional_storage () {
     fi
     check_additional_storage_status="storage_done"
     BASELINE_STATUS+=("$check_additional_storage_status")
+
+    ## Export vars for updating qubinode_vars.txt
+    export LIBVIRT_DIR="${LIBVIRT_DIR-none}"
+    export LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
 }
 
 # @description
@@ -1099,6 +1123,11 @@ function ask_about_domain() {
     fi
     ask_about_domain_status="domain_done"
     BASELINE_STATUS+=("$ask_about_domain_status")
+
+    ## Export vars for updating qubinode_vars.txt
+    export CONFIRM_USER_DOMAIN="${confirmed_user_domain:-yes}"
+    export IDM_DEPLOY_METHOD="${idm_deploy_method:-none}"
+    export DOMAIN="${domain:-$generated_domain}"
 }
 
 # @description
@@ -1147,9 +1176,12 @@ function get_idm_admin_user () {
     then
         printf "%s\n\n" ""
         local admin_user_msg="What is the admin username for ${cyn:?}${idm_server_hostname}${end:?}?"
-	confirm_correct "$admin_user_msg" idm_admin_existing_user
-	idm_admin_user="$idm_admin_existing_user"
+	    confirm_correct "$admin_user_msg" idm_admin_existing_user
+	    idm_admin_user="$idm_admin_existing_user"
     fi
+
+    ## Export vars for updating qubinode_vars.txt
+    export IDM_ADMIN_USER="${idm_admin_user:-admin}"
 }
 
 # @description
@@ -1163,7 +1195,7 @@ function ask_about_idm () {
     idm_choices="deploy existing"
     idm_hostname_prefix="${IDM_HOSTNAME_PREFIX:-idm01}"
     idm_server_hostname="${IDM_SERVER_HOSTNAME:-none}"
-    name_prefix="${name_prefix:-qbn}"
+    name_prefix="${NAME_PREFIX:-qbn}"
 
     ## set hostname
     if [ "A${idm_server_hostname}" == "Anone" ]
@@ -1208,6 +1240,13 @@ function ask_about_idm () {
 
     ask_about_idm_status="idm_done"
     BASELINE_STATUS+=("$ask_about_idm_status")
+
+    ## Export vars for updating qubinode_vars.txt
+    export IDM_HOSTNAME_PREFIX="${idm_hostname_prefix:-idm01}"
+    export DEPLOY_IDM="${DEPLOY_IDM:-yes}"
+    export IDM_SERVER_HOSTNAME="${idm_server_hostname:-none}"
+    export ALLOW_ZONE_OVERLAP="${allow_zone_overlap:-none}"
+    export IDM_SERVER_IP="${idm_server_ip:-none}"
 }
 
 # @description
@@ -1415,7 +1454,7 @@ function qubinode_setup_ansible ()
 	            if [ "${force_ansible}" == "ansible" ]
 	            then
                     printf "%s\n" "  Force ${ansible_msg}"
-	            ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
+	                ansible-galaxy collection install -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
                     ansible-galaxy install --force -r "${ANSIBLE_REQUIREMENTS_FILE}" > /dev/null 2>&1
 	            fi
             fi
@@ -1438,7 +1477,7 @@ function qubinode_setup_ansible ()
 # from playbooks/vars. A backup of each var is stored under the backup
 # directory.
 function qubinode_project_cleanup () {
-    test -d "${project_dir}/backup" || mkdir -p "${project_dir}"/backup/{vars,inventory}
+    test -d "${project_dir}/backups" || mkdir -p "${project_dir}"/backups/{vars,inventory}
     FILES=()
     timestamp=$(date -d "today" +"%Y%m%d%H%M")
     mapfile -t FILES < <(find "${project_dir}/inventory/" -not -path '*/\.*' -type f)
@@ -1451,12 +1490,12 @@ function qubinode_project_cleanup () {
             new_name="${f_name}.${timestamp}"
             if echo "$f"|grep -q inventory
             then 
-                mv "$f" "${project_dir}/backup/inventory/${new_name}"
+                mv "$f" "${project_dir}/backups/inventory/${new_name}"
             fi
 
             if echo "$f"| grep -q vars
             then
-                mv "$f" "${project_dir}/backup/vars/${new_name}"
+                mv "$f" "${project_dir}/backups/vars/${new_name}"
             fi
         done
     fi
@@ -1562,6 +1601,13 @@ function qubinode_maintenance_options () {
         qubinode_vars
     elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
     then
+        if [ "A${QUBINODE_BASELINE_COMPLETE:-no}" != 'Ayes' ]
+        then
+            cd "${project_dir}" || exit 1
+            ./qubinode-installer -m setup
+        else 
+            qubinode_baseline
+        fi
 	    local ansible_cmd
         local kvmhost_vars="${project_dir}/playbooks/vars/kvm_host.yml"
         local inventory="${project_dir}/inventory/hosts"

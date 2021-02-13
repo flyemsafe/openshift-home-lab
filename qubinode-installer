@@ -52,7 +52,6 @@ CURRENT_USER=$(whoami)
 vault_key_file="/home/${CURRENT_USER}/.vaultkey"
 VAULT_FILE="${project_dir:?}/playbooks/vars/qubinode_vault.yml"
 VAULT_SAMPLE_FILE="${project_dir:?}/samples/qubinode_vault.yml"
-QUBINODE_BASH_VARS="${project_dir:?}/qubinode_vars.txt"
 QUBINODE_ANSIBLE_VARS="${project_dir:?}/playbooks/vars/qubinode_vars.yml"
 QUBINODE_ANSIBLE_JSON="${project_dir:?}/playbooks/vars/qubinode_vars.json"
 QUBINODE_BASH_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.txt"
@@ -66,6 +65,7 @@ QUBINODE_INVENTORY_SAMPLE_FILE="${project_dir}/samples/hosts"
 
 
 ## Load existing vars
+QUBINODE_BASH_VARS="${project_dir:?}/qubinode_vars.txt"
 if [ -f "$QUBINODE_BASH_VARS" ]
 then
     set -o allexport
@@ -82,15 +82,15 @@ load_vault_vars
 ## OS Check
 pre_os_check
 
-
 ## This file consist of functions that are used throughout th code base
 ## declare defaults for required vars
 QUBINODE_ADMIN_USER="${QUBINODE_ADMIN_USER:-$CURRENT_USER}"
 ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-no}"
 PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-no}"
-domain_tld="${DOMAIN_TLD:-lan}"
-generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
-name_prefix="${NAME_PREFIX:-qbn}"
+domain_tld="${DOMAIN_TLD:-lab.qubinode.io}"
+export generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
+export name_prefix="${NAME_PREFIX:-qbn}"
+export DOMAIN_TLD="${domain_tld:-lan}"
 
 ## check if ansible is installed
 if which ansible > /dev/null 2>&1
@@ -111,7 +111,6 @@ function qubinode_baseline () {
     ## vars to track with function run has completed
     declare -a BASELINE_STATUS=()
     BASELINE_STATUS+=(initiate)
-    export qubinode_baseline_complete=no
 
     ## get the password for the admin user   
     ask_for_admin_user_pass
@@ -146,7 +145,7 @@ function qubinode_baseline () {
     ## Set baseline run to complete
     if [ "${#BASELINE_STATUS[@]}" -eq 9 ]
     then
-        export qubinode_baseline_complete=yes
+        export QUBINODE_BASELINE_COMPLETE=yes
     fi
 }
 
@@ -160,6 +159,11 @@ function qubinode_vars () {
     ## make a copy of the current bash vars file
     if [ -f "$QUBINODE_BASH_VARS" ]
     then
+        set -o allexport
+        # shellcheck disable=SC1091
+        # shellcheck source=playbooks/vars/qubinode_vars.yml
+        source "$QUBINODE_BASH_VARS"
+        set +o allexport
         cp "$QUBINODE_BASH_VARS" "$CURRENT_BASH_VARS_FILE"
         rm -f "$QUBINODE_BASH_VARS"
     fi
@@ -172,7 +176,7 @@ function qubinode_vars () {
 
     # shellcheck source=/dev/null
     . "$TMP_BASH_VARS_FILE"
-    
+
     ## Generate ansible vars yaml template
     ANSIBLE_TEMPLATE=$(mktemp)
     TMP_ANSIBLE_FILE=$(mktemp)
@@ -237,7 +241,7 @@ function main ()
     # Exit if this is executed as the root user
     if is_root 
     then
-        echo "Error: qubi-installer should be run as a normal user, not as root!"
+        echo "Error: qubinode-installer should be run as a normal user, not as root!"
     exit 1
     fi
 
