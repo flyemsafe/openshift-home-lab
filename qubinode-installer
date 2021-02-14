@@ -140,7 +140,7 @@ function qubinode_baseline () {
     ask_about_idm
 
     ## Get main network interface details
-    get_primary_interface
+    setup_networking
 
     ## Set baseline run to complete
     if [ "${#BASELINE_STATUS[@]}" -eq 9 ]
@@ -153,18 +153,18 @@ function qubinode_baseline () {
 function qubinode_vars () {
     ## Generate bash variables file
     TMP_BASH_VARS_FILE=$(mktemp)
-    CURRENT_BASH_VARS_FILE=$(mktemp)
+    CURRENT_BASH_VARS_FILE_BKUP=$(mktemp)
     
     # Default gen file
     ## make a copy of the current bash vars file
     if [ -f "$QUBINODE_BASH_VARS" ]
     then
-        set -o allexport
+        #set -o allexport
         # shellcheck disable=SC1091
         # shellcheck source=playbooks/vars/qubinode_vars.yml
-        source "$QUBINODE_BASH_VARS"
-        set +o allexport
-        cp "$QUBINODE_BASH_VARS" "$CURRENT_BASH_VARS_FILE"
+        #source "$QUBINODE_BASH_VARS"
+        #set +o allexport
+        cp "$QUBINODE_BASH_VARS" "$CURRENT_BASH_VARS_FILE_BKUP"
         rm -f "$QUBINODE_BASH_VARS"
     fi
 
@@ -206,7 +206,7 @@ function qubinode_vars () {
     fi
 
     ## Ensure inventory file exist
-    if [ ! -f "${QUBINODE_INVENTORY_SAMPLE_FILE}" ]
+    if [ ! -f "${QUBINODE_INVENTORY_FILE}" ]
     then
         cp "$QUBINODE_INVENTORY_SAMPLE_FILE" "$QUBINODE_INVENTORY_FILE"
     fi

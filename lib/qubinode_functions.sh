@@ -76,18 +76,19 @@ function setup_sudoers () {
        then
            local CMD="cp -f ${SUDOERS_TMP} /etc/sudoers.d/${QUBINODE_ADMIN_USER}"
            printf "%s\n" "  ${SU_MSG}"
-	   confirm "  Continue setting up sudoers for ${QUBINODE_ADMIN_USER}? ${cyn:?}yes/no${end:?}"
-	   if [ "A${response}" == "Ano" ]
+	       confirm "  Continue setting up sudoers for ${QUBINODE_ADMIN_USER}? ${cyn:?}yes/no${end:?}"
+	       if [ "A${response}" == "Ano" ]
            then
                printf "%s\n" "  You can manually setup sudoers then re-run the installer."
-	       exit 0
-	   fi
+	           exit 0
+	       fi
               
            ## Use root user password to setuo sudoers 
            printf "%s\n" "  ${SU_MSG2}"
            retry=0
            maxRetries=3
            retryInterval=15
+
            until [ ${retry} -ge ${maxRetries} ]
            do
                run_su_cmd "$CMD" && break
@@ -95,10 +96,10 @@ function setup_sudoers () {
                printf "%s\n" "  ${cyn:?}Try again. Enter the root user ${end:?}"
            done
 
-          if [ ${retry} -ge ${maxRetries} ]; then
-              printf "%s\n" "   ${red:?}Error: Could not authenicate as the root user.${end:?}"
-              exit 1
-          fi
+           if [ ${retry} -ge ${maxRetries} ]; then
+               printf "%s\n" "   ${red:?}Error: Could not authenicate as the root user.${end:?}"
+               exit 1
+           fi
        else
            printf "%s\n" "  ${SUDO_MSG}"
            echo "$__admin_pass" | sudo -S cp -f "${SUDOERS_TMP}" "/etc/sudoers.d/${QUBINODE_ADMIN_USER}" > /dev/null 2>&1
@@ -256,7 +257,7 @@ function return_netmask_ipaddr () {
 # * network
 # * mac address
 # * pointer record (ptr) notation for the ip address
-function get_primary_interface () {
+function discover_host_networking () {
     ## Default Vars
     netdevice="${NETWORK_DEVICE:-none}"
     ipaddress="${IPADDRESS:-none}"
@@ -281,60 +282,50 @@ function get_primary_interface () {
     if [ "A${netdevice}" == "Anone" ]
     then
         netdevice=$(ip route get 8.8.8.8 | awk -- '{printf $5}')
-        IPADDR_NETMASK=$(ip -o -f inet addr show "$netdevice" | awk '/scope global/ {print $4}')
-        # shellcheck disable=SC2034 
-        NETMASK_PREFIX=$(echo "$IPADDR_NETMASK" | awk -F'/' '{print $2}')
-        ## Return netmask and ipaddress
-        return_netmask_ipaddr "$IPADDR_NETMASK"
     fi
+
+    IPADDR_NETMASK=$(ip -o -f inet addr show "$netdevice" | awk '/scope global/ {print $4}')
+    # shellcheck disable=SC2034 
+    NETMASK_PREFIX=$(echo "$IPADDR_NETMASK" | awk -F'/' '{print $2}')
+    ## Return netmask and ipaddress
+    return_netmask_ipaddr "$IPADDR_NETMASK"
 
     ## Set ipaddress varaible
-    if [ "A${ipaddress}" == "Anone" ]
-    then
+    #if [ "A${ipaddress}" == "Anone" ]
+    #then
         ipaddress="${IPADDR}"
-    fi
+    #fi
 
     ## Set netmask address
-    if [ "A${netmask}" == "Anone" ]
-    then
+    #if [ "A${netmask}" == "Anone" ]
+    #then
         netmask="${NETMASK}"
-    fi
+    #fi
 
     ## set gateway
-    if [ "A${gateway}" == "Anone" ]
-    then
-        gateway=$(ip route get 8.8.8.8 | awk -F"via " 'NR==1{split($2,a," ");print a[1]}')
-    fi
+    #if [ "A${gateway}" == "Anone" ]
+    #then
+        gateway=$(ip route | grep "$netdevice" | awk '{print $3; exit}')
+        #gateway=$(ip route get 8.8.8.8 | awk -F"via " 'NR==1{split($2,a," ");print a[1]}')
+    #fi
 
     ## network 
-    if [ "A${network}" == "Anone" ]
-    then
+    #if [ "A${network}" == "Anone" ]
+    #then
         network="$(ipcalc -n "$IPADDR_NETMASK" | awk -F= '{print $2}')"
-    fi
+    #fi
 
     ## reverse zone
-    if [ "A${reverse_zone}" == "Anone" ]
-    then
+    #if [ "A${reverse_zone}" == "Anone" ]
+    #then
         reverse_zone=$(echo "$network" | awk -F . '{print $4"."$3"."$2"."$1".in-addr.arpa"}'| sed 's/^[^.]*.//g')
-    fi
+    #fi
 
     ## mac address
-    if [ "A${macaddr}" == "Anone" ]
-    then
+    #if [ "A${macaddr}" == "Anone" ]
+    #then
         macaddr=$(ip addr show "$netdevice" | grep link | awk '{print $2}' | head -1)
-    fi
-
-    ## Libvirt Network
-    if [ "A${confirm_libvirt_network}" == "Ayes" ]
-    then
-        libvirt_network_info
-    fi
-
-    ## Verify network interface details
-    if [ "A${confirm_networking}" == "Ayes" ]
-    then
-        verify_networking_info
-    fi
+    #fi
 
     get_primary_interface_status="interface_done"
     BASELINE_STATUS+=("$get_primary_interface_status")
@@ -349,6 +340,25 @@ function get_primary_interface () {
     export NETWORK="${network:-none}"
     export REVERSE_ZONE="${reverse_zone:-none}"
     export CONFIRM_LIBVIRT_NETWORK="${confirm_libvirt_network:-yes}"
+}
+
+# @description
+# Runs the functions discover_host_networking, libvirt_network_info and verify_networking_info
+function setup_networking () {
+ 
+    discover_host_networking
+
+    ## Libvirt Network
+    if [ "A${confirm_libvirt_network}" == "Ayes" ]
+    then
+        libvirt_network_info
+    fi
+
+    ## Verify network interface details
+    if [ "A${confirm_networking}" == "Ayes" ]
+    then
+        verify_networking_info
+    fi
 }
 
 # @description
@@ -418,15 +428,15 @@ function libvirt_network_info () {
 # @description
 # Asks user to confirm discovered network information.
 # 
-# @see get_primary_interface
+# @see discover_host_networking
 function verify_networking_info () {
-    printf "%s\n\n" "  The below networking information was discovered and will be used for creating a bridge network."
-    printf "%s\n" "  ${blu:?}NETWORK_DEVICE${end:?}=${cyn:?}${netdevice:?}${end:?}"
-    printf "%s\n" "  ${blu:?}IPADDRESS${end:?}=${cyn:?}${ipaddress:?}${end:?}"
-    printf "%s\n" "  ${blu:?}GATEWAY${end:?}=${cyn:?}${gateway:?}${end:?}"
-    printf "%s\n" "  ${blu:?}NETMASK${end:?}=${cyn:?}${netmask:?}${end:?}"
-    printf "%s\n" "  ${blu:?}NETWORK${end:?}=${cyn:?}${network:?}${end:?}"
-    printf "%s\n\n" "  ${blu:?}MACADDR${end:?}=${cyn:?}${macaddr:?}${end:?}"
+    printf "%s\n\n" "  The below networking information was discovered and will be used for creating a bridge NETWORK."
+    printf "%s\n" "  ${blu:?}NETWORK_DEVICE${end:?}=${cyn:?}${NETWORK_DEVICE:?}${end:?}"
+    printf "%s\n" "  ${blu:?}IPADDRESS${end:?}=${cyn:?}${IPADDRESS:?}${end:?}"
+    printf "%s\n" "  ${blu:?}GATEWAY${end:?}=${cyn:?}${GATEWAY:?}${end:?}"
+    printf "%s\n" "  ${blu:?}NETMASK${end:?}=${cyn:?}${NETMASK:?}${end:?}"
+    printf "%s\n" "  ${blu:?}NETWORK${end:?}=${cyn:?}${NETWORK:?}${end:?}"
+    printf "%s\n\n" "  ${blu:?}MACADDR${end:?}=${cyn:?}${MACADDR:?}${end:?}"
 
     confirm "  Do you want to change any of the above? ${cyn:?}yes/no${end:?}"
     if [ "A${response}" == "Ayes" ]
@@ -435,36 +445,37 @@ function verify_networking_info () {
         tmp_file=$(mktemp)
         while true
         do
-            networking_opts=("netdevice - ${cyn:?}${netdevice:?}${end:?}" \
-                             "ipaddress - ${cyn:?}${ipaddress:?}${end:?}" \
-                             "gateway   - ${cyn:?}${gateway:?}${end:?}" \
-                             "network   - ${cyn:?}${network:?}${end:?}" \
-                             "netmask   - ${cyn:?}${netmask:?}${end:?}" \
-                             "macaddr   - ${cyn:?}${macaddr:?}${end:?}" \
+            discover_host_networking
+            networking_opts=("NETWORK_DEVICE - ${cyn:?}${NETWORK_DEVICE:?}${end:?}" \
+                             "IPADDRESS - ${cyn:?}${IPADDRESS:?}${end:?}" \
+                             "GATEWAY   - ${cyn:?}${GATEWAY:?}${end:?}" \
+                             "NETWORK   - ${cyn:?}${NETWORK:?}${end:?}" \
+                             "NETMASK   - ${cyn:?}${NETMASK:?}${end:?}" \
+                             "MACADDR   - ${cyn:?}${MACADDR:?}${end:?}" \
                              "Reset     - Revert changes" \
                              "Save      - Save changes")
             createmenu "${networking_opts[@]}"
             result=$(echo "${selected_option}"| awk '{print $1}')
             case $result in
-                netdevice)
-            	    echo "netdevice=$netdevice" >> "$tmp_file"
-                    confirm_correct "Enter the network interface" netdevice
+                NETWORK_DEVICE)
+            	    echo "NETWORK_DEVICE=$NETWORK_DEVICE" >> "$tmp_file"
+                    confirm_correct "Enter the NETWORK interface" NETWORK_DEVICE
                     ;;
-                ipaddress)
-            	    echo "ipaddress=$ipaddress" >> "$tmp_file"
-                    confirm_correct "Enter ip address to assign to ${netdevice}" ipaddress
+                IPADDRESS)
+            	    echo "IPADDRESS=$IPADDRESS" >> "$tmp_file"
+                    confirm_correct "Enter ip address to assign to ${NETWORK_DEVICE}" IPADDRESS
                     ;;
-                gateway)
-            	    echo "gateway=$gateway" >> "$tmp_file"
-                    confirm_correct "Enter gateway address to assign to ${netdevice}" gateway
+                GATEWAY)
+            	    echo "GATEWAY=$GATEWAY" >> "$tmp_file"
+                    confirm_correct "Enter GATEWAY address to assign to ${NETWORK_DEVICE}" GATEWAY
                     ;;
-                network)
-            	    echo "network=$network" >> "$tmp_file"
-                    confirm_correct "Enter the netmask cidr for ip ${ipaddress}" network
+                NETWORK)
+            	    echo "NETWORK=$NETWORK" >> "$tmp_file"
+                    confirm_correct "Enter the NETMASK cidr for ip ${IPADDRESS}" NETWORK
                     ;;
-                macaddr)
-            	    echo "macaddr=$macaddr" >> "$tmp_file"
-                    confirm_correct "Enter the mac address assocaited with ${netdevice}" macaddr
+                MACADDR)
+            	    echo "MACADDR=$MACADDR" >> "$tmp_file"
+                    confirm_correct "Enter the mac address assocaited with ${NETWORK_DEVICE}" MACADDR
                     ;;
                 Reset)
 		    # shellcheck disable=SC1091
@@ -503,7 +514,13 @@ function pre_os_check() {
         rhel_release=$(< /etc/redhat-release grep -o "[7-8].[0-9]")
         # shellcheck disable=SC2034
         rhel_major=$(sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release)
-        os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
+        discovered_os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
+        if [ "A${discovered_os_name}" == 'A"Red Hat Enterprise Linux"' ]
+        then
+            discovered_os_name="rhel"
+        fi
+        os_name="${OS_NAME:-$discovered_os_name}"
+
         RHSM_SYSTEM=yes
     
         ## Export vars for updating qubinode_vars.txt
@@ -520,7 +537,7 @@ function pre_os_check() {
 # Exists the installer if subscription-manager not found.
 # If subscription-manager is found, determine if the host is registered to Red Hat.
 function check_rhsm_status () {
-    if [ "A${os_name}" == 'A"Red Hat Enterprise Linux"' ]
+    if [ "A${os_name}" == 'Arhel' ]
     then
         RHSM_SYSTEM=yes
         if ! which subscription-manager > /dev/null 2>&1
@@ -539,12 +556,12 @@ function check_rhsm_status () {
         printf "%s\n" ""
         printf "%s\n" "  ${blu:?}Confirming System Registration Status${end:?}"
         printf "%s\n" "  ${blu:?}***********************************************************${end:?}"
-	if sudo subscription-manager status | grep -q 'Overall Status: Current'
+	    if sudo subscription-manager status | grep -q 'Overall Status: Current'
         then
-	    SYSTEM_REGISTERED=yes
-	else
-	    SYSTEM_REGISTERED=no
-	    system_registered_msg="$(hostname) is not registered to Red Hat"
+	        SYSTEM_REGISTERED=yes
+	    else
+	        SYSTEM_REGISTERED=no
+	        system_registered_msg="$(hostname) is not registered to Red Hat"
         fi
     fi
     printf "%s\n" "  ${yel:?}${system_registered_msg}${end:?}"
@@ -623,11 +640,11 @@ function register_system () {
         if [ ${RESULT} -eq 0 ]
         then
             verify_rhsm_status
-	    SYSTEM_REGISTERED="yes"
+	        SYSTEM_REGISTERED="yes"
     	else
     	    printf "%s\n" " ${red:?}$(hostname) registration to RHSM was unsuccessfull.${end:?}"
             cat "${rhsm_reg_result}"
-	    exit 1
+	        exit 1
         fi
     fi
     register_system_status="register_done"
@@ -806,7 +823,7 @@ function load_vault_vars ()
         RHSM_PASSWORD=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^rhsm_password:/ {print $2}')
         RHSM_ORG=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^rhsm_org:/ {print $2}')
         RHSM_ACTKEY=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^rhsm_activationkey:/ {print $2}')
-        ADMIN_USER_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^admin_user_password:/ {print $2}')
+        ADMIN_USER_PASSWORD=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^admin_user_password:/ {print $2}')
 
 	    # shellcheck disable=SC2034 # used when vault file is generated
         IDM_DM_PASS=$($vault_parse_cmd "${VAULT_FILE}" | awk '/^idm_dm_pwd:/ {print $2}')
@@ -849,10 +866,10 @@ function rhsm_get_reg_method () {
         RHSM_REG_METHOD=$(echo "${user_response}"|awk '{print $1}')
     else
         check_rhsm_status
-        if [ "${system_registered}" == "no" ]
+        if [ "${SYSTEM_REGISTERED}" == "no" ]
         then
             printf "%s\n" "  Please register your system and run the installer again."
-	    exit 1
+	        exit 1
         fi
     fi
 }
@@ -1051,6 +1068,7 @@ function check_additional_storage () {
     ## Export vars for updating qubinode_vars.txt
     export LIBVIRT_DIR="${LIBVIRT_DIR-none}"
     export LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
+    export LIBVIRT_DIR_VERIFY="${libvirt_dir_verify:-none}"
 }
 
 # @description
@@ -1126,7 +1144,6 @@ function ask_about_domain() {
 
     ## Export vars for updating qubinode_vars.txt
     export CONFIRM_USER_DOMAIN="${confirmed_user_domain:-yes}"
-    export IDM_DEPLOY_METHOD="${idm_deploy_method:-none}"
     export DOMAIN="${domain:-$generated_domain}"
 }
 
@@ -1182,6 +1199,7 @@ function get_idm_admin_user () {
 
     ## Export vars for updating qubinode_vars.txt
     export IDM_ADMIN_USER="${idm_admin_user:-admin}"
+    export IDM_EXISTING_ADMIN_USER="${idm_admin_existing_user:-none}"
 }
 
 # @description
@@ -1247,6 +1265,7 @@ function ask_about_idm () {
     export IDM_SERVER_HOSTNAME="${idm_server_hostname:-none}"
     export ALLOW_ZONE_OVERLAP="${allow_zone_overlap:-none}"
     export IDM_SERVER_IP="${idm_server_ip:-none}"
+    export IDM_DEPLOY_METHOD="${idm_deploy_method:-none}"
 }
 
 # @description
@@ -1344,7 +1363,7 @@ function install_packages () {
                     if ! sudo subscription-manager repos --enable="$repo" > /dev/null 2>&1
                     then
                         printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}"
-                	exit 1
+                	    exit 1
                     fi
                 fi
             done
@@ -1407,10 +1426,10 @@ function install_packages () {
             then
                 printf "%s\n" "  ${cyn:?}Installing $pkg${end:?}"
                 if ! /usr/bin/pip3 install "$pkg" --user > /dev/null 2>&1
-		then
-	            printf "%s\n" "  ${red:?}Failed to $pkg ${end:?}"
-		    exit 1
-		fi
+		        then
+	                printf "%s\n" "  ${red:?}Failed to $pkg ${end:?}"
+		            exit 1
+		        fi
             fi
         done
         printf "%s\n" "  ${yel:?}All pip packages are present${end:?}"
@@ -1597,7 +1616,7 @@ function qubinode_maintenance_options () {
         fi
     elif [ "${qubinode_maintenance_opt}" == "network" ]
     then
-        get_primary_interface
+        setup_networking
         qubinode_vars
     elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
     then
@@ -1606,7 +1625,7 @@ function qubinode_maintenance_options () {
             cd "${project_dir}" || exit 1
             ./qubinode-installer -m setup
         else 
-            qubinode_baseline
+            ./qubinode-installer -m setup
         fi
 	    local ansible_cmd
         local kvmhost_vars="${project_dir}/playbooks/vars/kvm_host.yml"

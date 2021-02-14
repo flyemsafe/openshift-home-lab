@@ -2,6 +2,7 @@
 CONFIRM_USER_DOMAIN="${CONFIRM_USER_DOMAIN:-yes}"
 CONFIRM_NETWORKING="${CONFIRM_NETWORKING:-yes}"
 CONFIRM_LIBVIRT_NETWORK="${CONFIRM_LIBVIRT_NETWORK:-yes}"
+LIBVIRT_DIR_VERIFY="${LIBVIRT_DIR_VERIFY:-none}"
 
 ## none root user
 QUBINODE_ADMIN_USER="${CURRENT_USER}"
@@ -27,6 +28,7 @@ NETMASK="${NETMASK:-none}"
 ## optional
 MACADDR="${MACADDR:-none}"
 NETWORK="${NETWORK:-none}"
+NETMASK_PREFIX="${NETMASK_PREFIX:-none}"
 
 ##---------------------------------------------------------------------
 ## Varibles for DNS server
@@ -43,6 +45,8 @@ IDM_SERVER_HOSTNAME="${IDM_SERVER_HOSTNAME:-none}"
 IDM_ADMIN_USER="${IDM_ADMIN_USER:-admin}"
 IDM_SERVER_IP="${IDM_SERVER_IP:-none}"
 ALLOW_ZONE_OVERLAP="${ALLOW_ZONE_OVERLAP:-none}"
+USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP:-yes}"
+IDM_EXISTING_ADMIN_USER="${IDM_EXISTING_ADMIN_USER:-none}"
 IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD:-none}"
 
 ##---------------------------------------------------------------------
@@ -76,7 +80,7 @@ KVM_HOST_MTU="${MTU-1500}"
 KVM_HOST_LIBVIRT_EXTRA_DISK="${LIBVIRT_POOL_DISK}"
 KVM_HOST_LIBVIRT_DIR="{LIBVIRT_DIR}"
 
-KVM_HOST_MASK_PREFIX=""
+KVM_HOST_MASK_PREFIX="${KVM_HOST_MASK_PREFIX:-$NETMASK_PREFIX}"
 LIBVIRT_POOL_NAME_CHECK="yes"
 SKIP_LIBVIRT_POOL="yes"
 RUN_STORAGE_CHECK="yes"
@@ -84,31 +88,32 @@ QUBINODE_INSTALLER_HOST_COMPLETED="yes"
 RUN_QUBINODE_SETUP="yes"
 
 #kvm_host_mask_prefix=""
-#libvirt_pool_name_check: yes
+#libvirt_pool_name_check=yes
 #skip_libvirt_pool=no
 #run_storage_check=""
-#qubinode_installer_host_completed: no
-#run_qubinode_setup: yes
+#qubinode_installer_host_completed=no
+#run_qubinode_setup=yes
 
 ##---------------------------------------------------------------------
 ## Only edit below if you know what you are doing
 ##---------------------------------------------------------------------
 ## Qubinode project folder
 QUBINODE_PROJECT_DIR="${project_dir:-none}"
+VAULT_FILE="${VAULT_FILE:-none}"
+QUBINODE_ANSIBLE_VARS="${QUBINODE_ANSIBLE_VARS:-none}"
+
+DOMAIN_TLD="${DOMAIN_TLD:-lab.qubinode.io}"
+QUBINODE_BASELINE_COMPLETE="${QUBINODE_BASELINE_COMPLETE:-no}"
+
+OS_NAME="${OS_NAME:-none}"
 
 ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-none}"
 PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-none}"
+
 ALL_DISK="${ALL_DISK:-none}"
 ALL_INTERFACES="${ALL_INTERFACES:-none}"
-OS_NAME=${OS_NAME:-none}
-VAULT_FILE="${VAULT_FILE:-none}"
 
-QUBINODE_ANSIBLE_VARS="${QUBINODE_ANSIBLE_VARS:-none}"
 YUM_PACKAGES="python3-pyyaml python36 python3-pip python3-dns ansible git podman python-podman-api toolbox ipcalc"
 PIP_PACKAGES="yml2json"
 RHEL8_REPOS="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
-LIBVIRT_DIR_VERIFY="${libvirt_dir_verify:-none}"
-IDM_EXISTING_ADMIN_USER="${idm_admin_existing_user:-none}"
-USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP:-yes}"
-DOMAIN_TLD="${DOMAIN_TLD:-lab.qubinode.io}"
-QUBINODE_BASELINE_COMPLETE="${QUBINODE_BASELINE_COMPLETE:-no}"
+
