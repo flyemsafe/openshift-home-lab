@@ -511,9 +511,12 @@ function pre_os_check() {
     if grep -q 'Red Hat Enterprise Linux' /etc/redhat-release
     then
         # shellcheck disable=SC2034
-        rhel_release=$(< /etc/redhat-release grep -o "[7-8].[0-9]")
-        # shellcheck disable=SC2034
+        rhel_version=$(< /etc/redhat-release grep -o "[7-8].[0-9]")
         rhel_major=$(sed -rn 's/.*([0-9])\.[0-9].*/\1/p' /etc/redhat-release)
+        rhel_release="${rhel_major}"
+        rhel_minor=$(echo "$rhel_version" |cut -d. -f2)
+        # shellcheck disable=SC2034
+        
         discovered_os_name=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
         if [ "A${discovered_os_name}" == 'A"Red Hat Enterprise Linux"' ]
         then
@@ -527,6 +530,8 @@ function pre_os_check() {
         rhsm_system="$RHSM_SYSTEM"
         export RHEL_RELEASE="$rhel_release"
         export RHEL_MAJOR="$rhel_major"
+        export RHEL_MINOR="$rhel_minor"
+        export RHEL_VERSION="$rhel_version"
         export OS_NAME="$os_name"
         export RHSM_SYSTEM="$RHSM_SYSTEM"
     fi
@@ -802,6 +807,24 @@ function read_sensitive_data () {
         printf '*'
       fi
     done
+}
+
+# @description
+# Load qubinode vars from qubinode_vars.txt
+load_qubinode_vars () {
+    local _vars_file
+    
+    if [ -f "$QUBINODE_BASH_VARS" ]
+    then
+        _vars_file="${QUBINODE_BASH_VARS}"
+    else
+        _vars_file="${QUBINODE_BASH_VARS_TEMPLATE}"
+    fi
+    set -o allexport
+    # shellcheck disable=SC1091
+    # shellcheck source=playbooks/vars/qubinode_vars.yml
+    source "$_vars_file"
+    set +o allexport
 }
 
 # @description
@@ -1242,19 +1265,18 @@ function ask_about_idm () {
             confirm_menu_option "${idm_choices}" "${idm_msg}" idm_deploy_method
         fi
 
-	## check idm setup method
-	case "$idm_deploy_method" in
-	    deploy)
-		deploy_new_idm
-	        ;;
-	    existing)
-		connect_existing_idm
-	        ;;
-	    *)
-                #echo nothing > /dev/null
-		break
-		;;
-	esac
+	    ## check idm setup method
+	    case "$idm_deploy_method" in
+	        deploy)
+	    	    deploy_new_idm
+	            ;;
+	        existing)
+	    	    connect_existing_idm
+	            ;;
+	        *)
+	    	    return
+	    	;;
+	    esac
     fi
 
     ask_about_idm_status="idm_done"
@@ -1298,7 +1320,7 @@ function deploy_new_idm () {
         if [ "A${response}" == "Ayes" ]
         then
              allow_zone_overlap=yes
-	else
+	    else
              allow_zone_overlap=no
         fi
    fi
@@ -1675,4 +1697,136 @@ function qubinode_maintenance_options () {
 #    else
 #        display_help
     fi
+}
+
+function qubinode_product_deployment () {
+    local options="${product_options[*]:-none}"
+    local qubinode_product="${qubinode_product_opt:?}"
+    local product_maintenance="${product_maintenance:-none}"
+    local teardown="${teardown:-no}"
+    if [ "A${options}" != "A" ]
+    then
+        _product_options_file=$(mktemp)
+        for var_name in "${product_options[@]}"
+        do 
+            if echo "$var_name" | grep -q '='
+            then
+                echo "$var_name" >> "${_product_options_file}"
+            fi
+        done
+        # shellcheck source=/dev/null
+        # shellcheck disable=SC1091
+        source "${_product_options_file}"
+    else 
+        local tags=""
+    fi
+
+    case $qubinode_product in
+        rhel)
+            load_qubinode_vars
+            echo "qubinode_product=$qubinode_product"
+            echo "product_maintenance=$product_maintenance"
+            echo "product_modifiers=${product_options[*]}"
+            echo "teardown=$teardown"
+            # shellcheck source=/dev/null
+            # shellcheck disable=SC1091
+            source "${project_dir}/lib/qubinode_rhel.sh"
+
+            qubinode_rhel_vm_attributes
+            qubinode_vars
+            echo "vm_rhel_release=${vm_rhel_release:-none}"
+            echo "rhel_vm_hostname=${rhel_vm_hostname:-none}"
+            echo "rhel_vm_size=${rhel_vm_size:-none}"
+            echo "rhel_vm_release=${rhel_vm_release:-none}"
+
+            #if [ "A${teardown}" == "Atrue" ]
+            #then
+            #    qubinode_rhel_teardown
+            #else
+            #    if [ "A${qubinode_maintenance}" == "Atrue" ]
+            #    then
+            #        qubinode_rhel_maintenance
+            #    else
+            #        CHECK_PULL_SECRET=no
+            #        #setup_download_options
+            #        download_files
+            #        qubinode_deploy_rhel
+            #    fi
+            #fi
+            ;;
+#          okd4)
+#              openshift4_variables
+#              if [ "A${teardown}" == "Atrue" ]
+#              then
+#                  openshift4_qubinode_teardown
+#              elif [ "A${qubinode_maintenance}" == "Atrue" ]
+#              then
+#                  openshift4_server_maintenance
+#              else
+#                  ASK_SIZE=true
+#                  qubinode_deploy_ocp4
+#              fi
+#              ;;
+#          ocp4)
+#              CHECK_PULL_SECRET=yes
+#              openshift4_variables
+#              if [ "A${teardown}" == "Atrue" ]
+#              then
+#                  openshift4_qubinode_teardown
+#              elif [ "A${qubinode_maintenance}" == "Atrue" ]
+#              then
+#                  openshift4_server_maintenance
+#              else
+#                  ASK_SIZE=true
+#                  CHECK_PULL_SECRET=no
+#                  setup_download_options
+#                  qubinode_deploy_ocp4
+#              fi
+#              ;;
+#          satellite)
+#              if [ "A${teardown}" == "Atrue" ]
+#              then
+#                  qubinode_teardown_satellite
+#              else
+#                  rhel_major=7
+#                  CHECK_PULL_SECRET=no
+#                  setup_download_options
+#                  download_files
+#                  qubinode_deploy_satellite
+#              fi
+#              ;;
+#          tower)
+#              if [ "A${teardown}" == "Atrue" ]
+#              then
+#                  qubinode_teardown_tower
+#              else
+#                  CHECK_PULL_SECRET=no
+#                  setup_download_options
+#                  download_files
+#                  qubinode_deploy_tower
+#              fi
+#              ;;
+#          idm)
+#              if [ "A${teardown}" == "Atrue" ]
+#              then
+#                  echo "Running IdM VM teardown function"
+#                  qubinode_teardown_idm
+#              elif [ "A${qubinode_maintenance}" == "Atrue" ]
+#              then
+#                  qubinode_idm_maintenance
+#              else
+#                  CHECK_PULL_SECRET=no
+#                  echo "Running IdM VM deploy function"
+#                  setup_download_options
+#                  download_files
+#                  qubinode_deploy_idm
+#              fi
+#              ;;
+          *)
+              echo "Product ${PRODUCT_OPTION} is not supported."
+              echo "Supported products are: ${AVAIL_PRODUCTS}"
+              exit 1
+              ;;
+    esac
+
 }

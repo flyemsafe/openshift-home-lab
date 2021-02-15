@@ -8,7 +8,7 @@ LIBVIRT_DIR_VERIFY="${LIBVIRT_DIR_VERIFY:-none}"
 QUBINODE_ADMIN_USER="${CURRENT_USER}"
 
 ## all vms will be prefix with this name
-NAME_PREFIX="${NAME_PREFIX:-$name_prefix}"
+NAME_PREFIX="${NAME_PREFIX:-qbn}"
 
 
 ##---------------------------------------------------------------------
@@ -64,6 +64,8 @@ LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
 RHSM_SYSTEM="${RHSM_SYSTEM:-no}"
 RHEL_RELEASE="${RHEL_RELEASE:-none}"
 RHEL_MAJOR="${RHEL_MAJOR:-none}"
+RHEL_MINOR="${RHEL_MINOR:-none}"
+RHEL_VERSION="${RHEL_VERSION:-none}"
 SYSTEM_REGISTERED="${SYSTEM_REGISTERED:-no}"
 RHSM_REG_METHOD="${RHSM_REG_METHOD:-none}"
 
@@ -88,6 +90,29 @@ KVM_HOST_MASK_PREFIX="${KVM_HOST_MASK_PREFIX:-$NETMASK_PREFIX}"
 #QUBINODE_INSTALLER_HOST_COMPLETED="yes"
 #RUN_QUBINODE_SETUP="yes"
 
+##---------------------------------------------------------------------
+## RHEL VM VARS
+##---------------------------------------------------------------------
+QCOW_RHEL7_NAME="${qcow_rhel7_name:-rhel-server-7.8-x86_64-kvm.qcow2}"
+QCOW_RHEL8_NAME="${qcow_rhel8_name:-rhel-8.3-x86_64-kvm.qcow2}" 
+RHEL_VM_DEFAULT_RELEASE="8"
+RHEL_VM_DEFAULT_QCOW_IMG="${QCOW_RHEL8_NAME}"
+rhel_server_vm=
+    rhel_name="${rhel_vm_hostname:-''}"
+    rhel_vcpu="${rhel_vm_vcpu:-''}"
+    rhel_memory="${rhel_vm_memory:-''}"
+    rhel_root_disk_size="${rhel_vm_disk:-''}"
+    rhel_teardown=false
+    rhel_recreate=false
+    rhel_group=rhel
+    rhel_extra_storage=
+      pdashpsize=''
+        enable=false
+    rhel_enable=true
+
+RHEL_VM_RELEASE="${rhel_vm_major_release:-8}"
+RHEL_VM_QCOW_RHEL_RELEASE="${RHEL_VM_RELEASE}"
+RHEL_VM_OS_RELEASE="${RHEL_VM_RELEASE}"
 
 ##---------------------------------------------------------------------
 ## Only edit below if you know what you are doing

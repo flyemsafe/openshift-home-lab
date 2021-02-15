@@ -62,18 +62,16 @@ export ANSIBLE_REQUIREMENTS_FILE="${project_dir}/playbooks/requirements.yml"
 QUBINODE_INVENTORY_DIR="${project_dir}/inventory"
 QUBINODE_INVENTORY_FILE="${QUBINODE_INVENTORY_DIR}/hosts"
 QUBINODE_INVENTORY_SAMPLE_FILE="${project_dir}/samples/hosts"
+QUBINODE_BASH_VARS="${project_dir:?}/qubinode_vars.txt"
 
 
 ## Load existing vars
-QUBINODE_BASH_VARS="${project_dir:?}/qubinode_vars.txt"
-if [ -f "$QUBINODE_BASH_VARS" ]
-then
-    set -o allexport
-    # shellcheck disable=SC1091
-    # shellcheck source=playbooks/vars/qubinode_vars.yml
-    source "$QUBINODE_BASH_VARS"
-    set +o allexport
-fi
+QUBINODE_ADMIN_USER="${QUBINODE_ADMIN_USER:-$CURRENT_USER}"
+domain_tld="${DOMAIN_TLD:-lab.qubinode.io}"
+export generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
+ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-no}"
+PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-no}"
+load_qubinode_vars
 
 ## load variables from vault
 ## this should be refactored for speed, it currently takes 3 seconds to load
@@ -81,16 +79,6 @@ load_vault_vars
 
 ## OS Check
 pre_os_check
-
-## This file consist of functions that are used throughout th code base
-## declare defaults for required vars
-QUBINODE_ADMIN_USER="${QUBINODE_ADMIN_USER:-$CURRENT_USER}"
-ANSIBLE_INSTALLED="${ANSIBLE_INSTALLED:-no}"
-PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-no}"
-domain_tld="${DOMAIN_TLD:-lab.qubinode.io}"
-export generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
-export name_prefix="${NAME_PREFIX:-qbn}"
-export DOMAIN_TLD="${domain_tld:-lan}"
 
 ## check if ansible is installed
 if which ansible > /dev/null 2>&1
@@ -157,16 +145,16 @@ function qubinode_vars () {
     
     # Default gen file
     ## make a copy of the current bash vars file
-    if [ -f "$QUBINODE_BASH_VARS" ]
-    then
-        #set -o allexport
-        # shellcheck disable=SC1091
-        # shellcheck source=playbooks/vars/qubinode_vars.yml
-        #source "$QUBINODE_BASH_VARS"
-        #set +o allexport
-        cp "$QUBINODE_BASH_VARS" "$CURRENT_BASH_VARS_FILE_BKUP"
-        rm -f "$QUBINODE_BASH_VARS"
-    fi
+    #if [ -f "$QUBINODE_BASH_VARS" ]
+    #then
+    #    #set -o allexport
+    #    # shellcheck disable=SC1091
+    #    # shellcheck source=playbooks/vars/qubinode_vars.yml
+    #    #source "$QUBINODE_BASH_VARS"
+    #    #set +o allexport
+    #    cp "$QUBINODE_BASH_VARS" "$CURRENT_BASH_VARS_FILE_BKUP"
+    #    rm -f "$QUBINODE_BASH_VARS"
+    #fi
 
     ## Generate an updated bash vars file
     ( echo "cat <<EOF>$QUBINODE_BASH_VARS";
@@ -185,6 +173,7 @@ function qubinode_vars () {
     cp "$QUBINODE_ANSIBLE_VARS_TEMPLATE" "$ANSIBLE_TEMPLATE"
     cat "$QUBINODE_BASH_VARS" >> "$ANSIBLE_TEMPLATE"
     sed -i 's/=/: /g' "$ANSIBLE_TEMPLATE"
+    sed -i 's/pdashp/- /g' "$ANSIBLE_TEMPLATE"
     
     ( echo "cat <<EOF>$QUBINODE_ANSIBLE_VARS";
     cat "$ANSIBLE_TEMPLATE";
@@ -200,10 +189,10 @@ function qubinode_vars () {
     sed -i 's/"no"/no/g' "$QUBINODE_ANSIBLE_VARS"
     
     ## Generate JSON for future use
-    if which yml2json > /dev/null 2>&1
-    then
-        yml2json "$QUBINODE_ANSIBLE_VARS" --pretty --output "$QUBINODE_ANSIBLE_JSON"
-    fi
+    #if which yml2json > /dev/null 2>&1
+    #then
+    #    yml2json "$QUBINODE_ANSIBLE_VARS" --pretty --output "$QUBINODE_ANSIBLE_JSON"
+    #fi
 
     ## Ensure inventory file exist
     if [ ! -f "${QUBINODE_INVENTORY_FILE}" ]
@@ -247,8 +236,10 @@ function main ()
 
     qubinode_product=false
     local product_options=("")
-    NUM_ARGS="$#"
-    ALL_ARGS="$@"
+    local qubinode_maintenance=""
+    local product_maintenance=""
+    export NUM_ARGS="$#"
+    export ALL_ARGS="$@"
     while getopts ":c:dvhm:p:a:" opt;
     do
         case $opt in
@@ -311,8 +302,8 @@ function main ()
         echo "this will eventually run display_openshift_msg_ocp4"
     elif [ "A${qubinode_product}" == "Atrue" ] && [ "A${qubinode_maintenance}" == "Atrue" ]
     then
-        product_maintenance="${qubinode_maintenance_opt}"
-        qubinode_product_deployment $qubinode_product_opt
+        export product_maintenance="${qubinode_maintenance_opt}"
+        qubinode_product_deployment "${qubinode_product_opt}"
     elif [ "A${qubinode_maintenance}" == "Atrue" ]
     then
         qubinode_maintenance_options
