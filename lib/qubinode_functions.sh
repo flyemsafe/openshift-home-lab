@@ -871,6 +871,7 @@ function rhsm_get_reg_method () {
             printf "%s\n" "  Please register your system and run the installer again."
 	        exit 1
         fi
+        RHSM_REG_METHOD="skip"
     fi
 }
 
