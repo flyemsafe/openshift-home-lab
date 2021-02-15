@@ -81,18 +81,13 @@ KVM_HOST_LIBVIRT_EXTRA_DISK="${LIBVIRT_POOL_DISK}"
 KVM_HOST_LIBVIRT_DIR="{LIBVIRT_DIR}"
 
 KVM_HOST_MASK_PREFIX="${KVM_HOST_MASK_PREFIX:-$NETMASK_PREFIX}"
-LIBVIRT_POOL_NAME_CHECK="yes"
-SKIP_LIBVIRT_POOL="yes"
-RUN_STORAGE_CHECK="yes"
-QUBINODE_INSTALLER_HOST_COMPLETED="yes"
-RUN_QUBINODE_SETUP="yes"
 
-#kvm_host_mask_prefix=""
-#libvirt_pool_name_check=yes
-#skip_libvirt_pool=no
-#run_storage_check=""
-#qubinode_installer_host_completed=no
-#run_qubinode_setup=yes
+#LIBVIRT_POOL_NAME_CHECK="yes"
+#SKIP_LIBVIRT_POOL="yes"
+#RUN_STORAGE_CHECK="yes"
+#QUBINODE_INSTALLER_HOST_COMPLETED="yes"
+#RUN_QUBINODE_SETUP="yes"
+
 
 ##---------------------------------------------------------------------
 ## Only edit below if you know what you are doing
