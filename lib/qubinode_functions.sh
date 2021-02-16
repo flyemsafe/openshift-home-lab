@@ -268,6 +268,7 @@ function discover_host_networking () {
     reverse_zone="${REVERSE_ZONE:-none}"
     confirm_networking="${CONFIRM_NETWORKING:-yes}"
     confirm_libvirt_network="${CONFIRM_LIBVIRT_NETWORK:-yes}"
+    libvirt_bridge_name="${LIBVIRT_BRIDGE_NAME}"
 
     ## Get all interfaces except wireless and bridge
     declare -a INTERFACES=()
@@ -279,6 +280,11 @@ function discover_host_networking () {
 
     ## Get primary network device
     ## Get ipaddress, netmask, netmask cidr prefix
+    if ip addr show "${libvirt_bridge_name}" >/dev/null 2>&1
+    then
+      netdevice="${libvirt_bridge_name}"
+    fi
+
     if [ "A${netdevice}" == "Anone" ]
     then
         netdevice=$(ip route get 8.8.8.8 | awk -- '{printf $5}')
@@ -330,8 +336,16 @@ function discover_host_networking () {
     get_primary_interface_status="interface_done"
     BASELINE_STATUS+=("$get_primary_interface_status")
 
+    # If current interface is the qubinode bridge
+    # reset it to the master link interface
+    ## TODO: this should also just check if the qubinode bridge interface exist
+    ## and find the master link interface and use that by default
+    if [ "A${netdevice}" == "A${libvirt_bridge_name}" ]
+    then
+        netdevice=$(ip link show master ${libvirt_bridge_name}|awk -F: '/state UP/ {sub(/^[ \t]+/, "");print $2}'|sed -e 's/^[ \t]*//')
+    fi
+
     ## Export vars for updating qubinode_vars.txt
-    export CONFIRM_NETWORKING="${confirm_networking:-yes}"
     export NETWORK_DEVICE="${netdevice:-none}"
     export IPADDRESS="${ipaddress:-none}"
     export GATEWAY="${gateway:-none}"
@@ -339,14 +353,21 @@ function discover_host_networking () {
     export MACADDR="${macaddr:-none}"
     export NETWORK="${network:-none}"
     export REVERSE_ZONE="${reverse_zone:-none}"
-    export CONFIRM_LIBVIRT_NETWORK="${confirm_libvirt_network:-yes}"
 }
 
 # @description
 # Runs the functions discover_host_networking, libvirt_network_info and verify_networking_info
 function setup_networking () {
  
-    discover_host_networking
+    local confirm_libvirt_network="${CONFIRM_LIBVIRT_NETWORK:-yes}"
+    local confirm_networking="${CONFIRM_NETWORKING:-yes}"
+    ## Verify network interface details
+
+    if [ "A${confirm_networking}" == "Ayes" ]
+    then
+        discover_host_networking
+        verify_networking_info
+    fi    
 
     ## Libvirt Network
     if [ "A${confirm_libvirt_network}" == "Ayes" ]
@@ -354,11 +375,8 @@ function setup_networking () {
         libvirt_network_info
     fi
 
-    ## Verify network interface details
-    if [ "A${confirm_networking}" == "Ayes" ]
-    then
-        verify_networking_info
-    fi
+    export CONFIRM_NETWORKING="${confirm_networking:-yes}"
+
 }
 
 # @description
@@ -417,12 +435,13 @@ function libvirt_network_info () {
             confirm_libvirt_network=no
         fi
     fi
-    verify_networking_info
 
     ## Export vars for updating qubinode-vars.txt
     export CREATE_LIBVIRT_BRIDGE="${create_libvirt_bridge:-yes}"
     export LIBVIRT_NETWORK_NAME="${libvirt_network_name:-default}"
     export LIBVIRT_BRIDGE_NAME="${libvirt_bridge_name:-qubibr0}"
+    export CONFIRM_LIBVIRT_NETWORK="${confirm_libvirt_network:-yes}"
+    
 }
 
 # @description
@@ -1462,6 +1481,30 @@ function install_packages () {
 }
 
 # @description
+# Installs the rhsm-cli tool - https://github.com/antonioromito/rhsm-api-client
+function install_rhsm_cli () {
+    if [ ! -f "${project_dir}/.python/rhsm_cli/bin/rhsm-cli" ]
+    then
+        echo "Install install_rhsm_cli"
+        rpm -qa | grep -q python3-pip || sudo yum install -y -q -e 0 python3-pip git > /dev/null 2>&1
+        test -d "${project_dir}/.python" || mkdir "${project_dir}/.python"
+        if [ -d "${project_dir}/.python" ]
+        then
+            cd "${project_dir}/.python" || exit 1
+            python3 -m venv rhsm_cli
+            source "${project_dir}/.python/rhsm_cli/bin/activate"
+            git clone https://github.com/antonioromito/rhsm-api-client > /dev/null 2>&1
+            cd rhsm-api-client || exit 1
+            pip3 install -r requirements.txt > /dev/null 2>&1
+            python3 setup.py install --record files.txt > /dev/null 2>&1
+            deactivate
+            cd "${project_dir}" || exit 1
+        fi
+    fi
+}
+
+
+# @description
 # Installs and sets up ansible.
 function qubinode_setup_ansible ()
 {
@@ -1612,6 +1655,7 @@ function qubinode_maintenance_options () {
     if [ "${qubinode_maintenance_opt}" == "setup" ]
     then
         printf "%s\n" "  ${blu:?}Running Qubinode Setup${end:?}"
+        load_qubinode_vars
         qubinode_baseline
         qubinode_vars
         qubinode_vault_file
@@ -1724,6 +1768,11 @@ function qubinode_product_deployment () {
     case $qubinode_product in
         rhel)
             load_qubinode_vars
+            if [ "A${QUBINODE_BASELINE_COMPLETE:-no}" != 'Ayes' ]
+            then
+                cd "${project_dir}" || exit 1
+                ./qubinode-installer -m setup
+            fi
             echo "qubinode_product=$qubinode_product"
             echo "product_maintenance=$product_maintenance"
             echo "product_modifiers=${product_options[*]}"
@@ -1733,6 +1782,7 @@ function qubinode_product_deployment () {
             source "${project_dir}/lib/qubinode_rhel.sh"
 
             qubinode_rhel_vm_attributes
+            qcow_image_exist
             qubinode_vars
             echo "vm_rhel_release=${vm_rhel_release:-none}"
             echo "rhel_vm_hostname=${rhel_vm_hostname:-none}"

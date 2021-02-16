@@ -6,6 +6,7 @@ LIBVIRT_DIR_VERIFY="${LIBVIRT_DIR_VERIFY:-none}"
 
 ## none root user
 QUBINODE_ADMIN_USER="${CURRENT_USER}"
+ADMIN_USER="$QUBINODE_ADMIN_USER"
 
 ## all vms will be prefix with this name
 NAME_PREFIX="${NAME_PREFIX:-qbn}"
@@ -53,7 +54,7 @@ IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD:-none}"
 ## Libvirt variables
 ##---------------------------------------------------------------------
 PRIMARY_DISK="${PRIMARY_DISK:-none}"
-LIBVIRT_DIR="${LIBVIRT_DIR:-none}"
+LIBVIRT_DIR="${LIBVIRT_DIR:-/var/lib/libvirt/images}"
 LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK:-none}"
 CREATE_LIBVIRT_STORAGE="${create_libvirt_lvm:-none}"
 LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
@@ -93,10 +94,13 @@ KVM_HOST_MASK_PREFIX="${KVM_HOST_MASK_PREFIX:-$NETMASK_PREFIX}"
 ##---------------------------------------------------------------------
 ## RHEL VM VARS
 ##---------------------------------------------------------------------
+QCOW_RHEL8_CHECKSUM="321c20a732419472ba584ea34cd2cab79db2ea1790abe467ea3c0e2ca521a6b7"
+QCOW_RHEL7_CHECKSUM="1df6c664678c0164914a426e832c0b4a1b438360075e49a288f70623915a8697"
 QCOW_RHEL7_NAME="${qcow_rhel7_name:-rhel-server-7.8-x86_64-kvm.qcow2}"
 QCOW_RHEL8_NAME="${qcow_rhel8_name:-rhel-8.3-x86_64-kvm.qcow2}" 
 RHEL_VM_DEFAULT_RELEASE="8"
-RHEL_VM_DEFAULT_QCOW_IMG="${QCOW_RHEL8_NAME}"
+RHEL_VM_DEFAULT_QCOW_IMG="${rhel_vm_qcow_image:-$QCOW_RHEL8_NAME}"
+RHEL_VM_DEFAULT_QCOW_IMG_CHECKSUM="${rhel_qcow_image_checksum:-$QCOW_RHEL8_CHECKSUM}"
 rhel_server_vm=
     rhel_name="${rhel_vm_hostname:-''}"
     rhel_vcpu="${rhel_vm_vcpu:-''}"
@@ -113,6 +117,11 @@ rhel_server_vm=
 RHEL_VM_RELEASE="${rhel_vm_major_release:-8}"
 RHEL_VM_QCOW_RHEL_RELEASE="${RHEL_VM_RELEASE}"
 RHEL_VM_OS_RELEASE="${RHEL_VM_RELEASE}"
+RHSM_TOKEN="${project_dir}/rhsm_token"
+RHSM_CLI_DOC_URL="https://github.com/Qubinode/qubinode-installer/tree/master/docs#getting-the-rhel-7-or-8-qcow-image"
+
+
+
 
 ##---------------------------------------------------------------------
 ## Only edit below if you know what you are doing
@@ -137,3 +146,6 @@ YUM_PACKAGES="python3-pyyaml python36 python3-pip python3-dns ansible git podman
 PIP_PACKAGES="yml2json"
 RHEL8_REPOS="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
 
+
+OCP_TOKEN="${project_dir}/ocp_token"
+PULL_SECRET="${project_dir}/pull-secret.txt"
