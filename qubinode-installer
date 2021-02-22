@@ -52,17 +52,17 @@ CURRENT_USER=$(whoami)
 vault_key_file="/home/${CURRENT_USER}/.vaultkey"
 VAULT_FILE="${project_dir:?}/playbooks/vars/qubinode_vault.yml"
 VAULT_SAMPLE_FILE="${project_dir:?}/samples/qubinode_vault.yml"
-QUBINODE_ANSIBLE_VARS="${project_dir:?}/playbooks/vars/qubinode_vars.yml"
-QUBINODE_ANSIBLE_JSON="${project_dir:?}/playbooks/vars/qubinode_vars.json"
-QUBINODE_BASH_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.txt"
-QUBINODE_ANSIBLE_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.yml"
+export QUBINODE_ANSIBLE_VARS="${project_dir:?}/playbooks/vars/qubinode_vars.yml"
+export QUBINODE_ANSIBLE_JSON="${project_dir:?}/playbooks/vars/qubinode_vars.json"
+export QUBINODE_BASH_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.txt"
+export QUBINODE_ANSIBLE_VARS_TEMPLATE="${project_dir:?}/samples/qubinode_vars.yml"
 # shellcheck disable=SC2034  # called when vault file is generated
 RANDOM_GENERATED_PASS=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 8)
 export ANSIBLE_REQUIREMENTS_FILE="${project_dir}/playbooks/requirements.yml"
 QUBINODE_INVENTORY_DIR="${project_dir}/inventory"
-QUBINODE_INVENTORY_FILE="${QUBINODE_INVENTORY_DIR}/hosts"
-QUBINODE_INVENTORY_SAMPLE_FILE="${project_dir}/samples/hosts"
-QUBINODE_BASH_VARS="${project_dir:?}/qubinode_vars.txt"
+export QUBINODE_INVENTORY_FILE="${QUBINODE_INVENTORY_DIR}/hosts"
+export QUBINODE_INVENTORY_SAMPLE_FILE="${project_dir}/samples/hosts"
+export QUBINODE_BASH_VARS="${project_dir:?}/qubinode_vars.txt"
 
 
 ## Load existing vars
@@ -137,11 +137,11 @@ function qubinode_baseline () {
     fi
 }
 
-## this function generates the required vars file
+# this function generates the required vars file
 function qubinode_vars () {
     ## Generate bash variables file
     TMP_BASH_VARS_FILE=$(mktemp)
-    CURRENT_BASH_VARS_FILE_BKUP=$(mktemp)
+    #CURRENT_BASH_VARS_FILE_BKUP=$(mktemp)
     
     # Default gen file
     ## make a copy of the current bash vars file
@@ -163,7 +163,7 @@ function qubinode_vars () {
     ) >"$TMP_BASH_VARS_FILE"
 
     # shellcheck source=/dev/null
-    . "$TMP_BASH_VARS_FILE"
+    . "$QUBINODE_BASH_VARS"
 
     ## Generate ansible vars yaml template
     ANSIBLE_TEMPLATE=$(mktemp)
@@ -199,6 +199,70 @@ function qubinode_vars () {
     then
         cp "$QUBINODE_INVENTORY_SAMPLE_FILE" "$QUBINODE_INVENTORY_FILE"
     fi
+}
+
+function generate_qubinode_vars () {
+    # based on https://www.starkandwayne.com/blog/bashing-your-yaml/
+
+    ## INPUTS
+    local bash_vars_template="${1:?}"
+    local generated_bash_vars="${2:?}"
+    local ansible_vars_template="${3:?}"
+    local generated_ansible_vars="${4:?}"
+   
+    ## Generate an updated bash vars file
+    template="$(cat "${bash_vars_template}")"
+    template=$(sed 's/\([^\\]\)"/\1\\"/g; s/^"/\\"/g' <<< "$template")
+    eval "echo \"${template}\"" > "${generated_bash_vars}"
+
+    # Load updated bash vars
+    # shellcheck source=/dev/null
+    if [ "${SOURCE_VARS:-yes}" == "yes" ]
+    then
+        . "$generated_bash_vars"
+    fi
+
+    ## Generate YAML vars file
+    cat "${ansible_vars_template}" > "${generated_ansible_vars}"
+    cat "${generated_bash_vars}" >> "${generated_ansible_vars}"
+    sed -i 's/=/: /g' "$generated_ansible_vars"
+    sed -i 's/pdashp/- /g' "$generated_ansible_vars"
+    sed -i 's#^[[:alpha:]].*:#\L&#g' "$generated_ansible_vars"
+    sed -i 's/"yes"/yes/g' "$generated_ansible_vars"
+    sed -i 's/"no"/no/g' "$generated_ansible_vars"
+
+
+#    ## Generate ansible vars yaml template
+#    test -f "$generated_ansible_vars" && rm -f "$generated_ansible_vars"
+#    cp "$bash_vars_template" "$tmp_ansible_vars_file"
+#    cat "$ansible_vars_template" >> "$tmp_ansible_vars_template"
+#    sed -i 's/=/: /g' "$tmp_ansible_vars_template"
+#    sed -i 's/pdashp/- /g' "$tmp_ansible_vars_template"
+#    
+#    ( echo "cat <<EOF>$generated_ansible_vars";
+#    cat "$tmp_ansible_vars_template";
+#    printf "\nEOF";
+#    ) >"$tmp_ansible_vars_file"
+#
+#    # shellcheck source=/dev/null
+#    . "$tmp_ansible_vars_file"
+#    
+#    ## Final clean up
+#    sed -i 's#^[[:alpha:]].*:#\L&#g' "$generated_ansible_vars"
+#    sed -i 's/"yes"/yes/g' "$generated_ansible_vars"
+#    sed -i 's/"no"/no/g' "$generated_ansible_vars"
+#    
+#    ## Generate JSON for future use
+#    #if which yml2json > /dev/null 2>&1
+#    #then
+#    #    yml2json "$generated_ansible_vars" --pretty --output "$QUBINODE_ANSIBLE_JSON"
+#    #fi
+#
+#    ## Ensure inventory file exist
+#    #if [ ! -f "${QUBINODE_INVENTORY_FILE}" ]
+#    #then
+#    #    cp "$QUBINODE_INVENTORY_SAMPLE_FILE" "$QUBINODE_INVENTORY_FILE"
+#    #fi
 }
 
 function qubinode_vault_file () 

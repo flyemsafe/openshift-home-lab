@@ -127,7 +127,7 @@ function setup_sudoers () {
 # Trys to determine which disk device is assosiated with the root mount /.
 function getPrimaryDisk () {
     primary_disk="${PRIMARY_DISK:-none}"
-    if [ "A${primary_disk}" == "Anone" ]
+    if [ "${primary_disk-:A}" == "none" ]
     then
         if which lsblk >/dev/null 2>&1
         then
@@ -268,7 +268,7 @@ function discover_host_networking () {
     reverse_zone="${REVERSE_ZONE:-none}"
     confirm_networking="${CONFIRM_NETWORKING:-yes}"
     confirm_libvirt_network="${CONFIRM_LIBVIRT_NETWORK:-yes}"
-    libvirt_bridge_name="${LIBVIRT_BRIDGE_NAME}"
+    libvirt_bridge_name="${LIBVIRT_BRIDGE_NAME:-qbn}"
 
     ## Get all interfaces except wireless and bridge
     declare -a INTERFACES=()
@@ -1143,7 +1143,7 @@ function set_idm_static_ip () {
 # @description
 # Ask user to enter their dns zone name.
 function ask_about_domain() {
-    domain_tld="${DOMAIN_TLD:-lan}"
+    domain_tld="${DOMAIN_TLD:?}"
     generated_domain="${QUBINODE_ADMIN_USER}.${domain_tld}"
     domain="${DOMAIN:-$generated_domain}"
     confirmed_user_domain="${CONFIRM_USER_DOMAIN:-yes}"
@@ -1657,7 +1657,8 @@ function qubinode_maintenance_options () {
         printf "%s\n" "  ${blu:?}Running Qubinode Setup${end:?}"
         load_qubinode_vars
         qubinode_baseline
-        qubinode_vars
+        #qubinode_vars
+        generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
         qubinode_vault_file
     elif [ "${qubinode_maintenance_opt}" == "clean" ]
     then
@@ -1668,7 +1669,8 @@ function qubinode_maintenance_options () {
         check_rhsm_status
         ask_user_for_rhsm_credentials
         register_system
-        qubinode_vars
+        #qubinode_vars
+        generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
         qubinode_vault_file
     elif [ "${qubinode_maintenance_opt}" == "ansible" ]
     then
@@ -1678,13 +1680,14 @@ function qubinode_maintenance_options () {
             exit 1
         else
             qubinode_setup_ansible
-            qubinode_vars
+            qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
             qubinode_vault_file
         fi
     elif [ "${qubinode_maintenance_opt}" == "network" ]
     then
         setup_networking
-        qubinode_vars
+        #qubinode_vars
+        generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
     elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
     then
         if [ "A${QUBINODE_BASELINE_COMPLETE:-no}" != 'Ayes' ]
@@ -1717,7 +1720,8 @@ function qubinode_maintenance_options () {
 	    if [ -f "${inventory}" ] && [ -f "${kvmhost_vars}" ]
         then
             printf "%s\n" "  ${blu:?}Running Qubinode KVMHOST setup${end:?}"
-            qubinode_vars
+            #qubinode_vars
+            generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
             qubinode_vault_file
 	        echo "${ansible_cmd}"|sh
         else
@@ -1783,7 +1787,9 @@ function qubinode_product_deployment () {
 
             qubinode_rhel_vm_attributes
             qcow_image_exist
-            qubinode_vars
+            #qubinode_vars
+            generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
+            qubinode_deploy_rhel
             echo "vm_rhel_release=${vm_rhel_release:-none}"
             echo "rhel_vm_hostname=${rhel_vm_hostname:-none}"
             echo "rhel_vm_size=${rhel_vm_size:-none}"
@@ -1873,8 +1879,8 @@ function qubinode_product_deployment () {
 #              fi
 #              ;;
           *)
-              echo "Product ${PRODUCT_OPTION} is not supported."
-              echo "Supported products are: ${AVAIL_PRODUCTS}"
+              echo "Product ${qubinode_product} is not supported."
+              echo "Supported products are: ${AVAILABLE_PRODUCTS}"
               exit 1
               ;;
     esac

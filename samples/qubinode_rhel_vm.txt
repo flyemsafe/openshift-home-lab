@@ -1,0 +1,22 @@
+rhel_vm_default_release="8"
+rhel_vm_default_qcow_img="${rhel_vm_qcow_image:-$QCOW_RHEL8_NAME}"
+rhel_vm_default_qcow_img_checksum="${rhel_qcow_image_checksum:-$QCOW_RHEL8_CHECKSUM}"
+rhel_vm_os_version="${RHEL8_VM_VERSION}"
+rhel_vm_os_release="${RHEL_VM_OS_VERSION}"
+cloud_init_vm_image="${RHEL_VM_DEFAULT_QCOW_IMG}"
+rhel_vm_qcow_image_file="${rhel_vm_qcow_image_file:-none}"
+os_variant="rhel${RHEL_VERSION}"
+vm_gateway="${GATEWAY}"
+
+rhel_server_vm=
+    rhel_name="${rhel_vm_hostname:-''}"
+    rhel_vcpu="${rhel_vm_vcpu:-''}"
+    rhel_memory="${rhel_vm_memory:-''}"
+    rhel_root_disk_size="${rhel_vm_disk:-''}"
+    rhel_teardown=false
+    rhel_recreate=false
+    rhel_group=rhel
+    rhel_extra_storage=
+      pdashpsize=''
+        enable=false
+    rhel_enable=true

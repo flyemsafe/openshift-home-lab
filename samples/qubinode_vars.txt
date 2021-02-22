@@ -3,6 +3,7 @@ CONFIRM_USER_DOMAIN="${CONFIRM_USER_DOMAIN:-yes}"
 CONFIRM_NETWORKING="${CONFIRM_NETWORKING:-yes}"
 CONFIRM_LIBVIRT_NETWORK="${CONFIRM_LIBVIRT_NETWORK:-yes}"
 LIBVIRT_DIR_VERIFY="${LIBVIRT_DIR_VERIFY:-none}"
+CREATE_LIBVIRT_STORAGE="${create_libvirt_lvm:-yes}"
 
 ## none root user
 QUBINODE_ADMIN_USER="${CURRENT_USER}"
@@ -36,6 +37,7 @@ NETMASK_PREFIX="${NETMASK_PREFIX:-none}"
 ##---------------------------------------------------------------------
 REVERSE_ZONE="${REVERSE_ZONE:-none}"
 DOMAIN="${DOMAIN:-$generated_domain}"
+DNS_SERVER="${DNS_SERVER:-none}"
 
 ##---------------------------------------------------------------------
 ## Varibles for IdM server
@@ -49,6 +51,7 @@ ALLOW_ZONE_OVERLAP="${ALLOW_ZONE_OVERLAP:-none}"
 USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP:-yes}"
 IDM_EXISTING_ADMIN_USER="${IDM_EXISTING_ADMIN_USER:-none}"
 IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD:-none}"
+IPA_HOST="${IDM_SERVER_HOSTNAME}.${DOMAIN}"
 
 ##---------------------------------------------------------------------
 ## Libvirt variables
@@ -56,7 +59,6 @@ IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD:-none}"
 PRIMARY_DISK="${PRIMARY_DISK:-none}"
 LIBVIRT_DIR="${LIBVIRT_DIR:-/var/lib/libvirt/images}"
 LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK:-none}"
-CREATE_LIBVIRT_STORAGE="${create_libvirt_lvm:-none}"
 LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
 
 ##---------------------------------------------------------------------
@@ -81,7 +83,7 @@ KVM_HOST_NETMASK="${NETMASK}"
 KVM_HOST_MTU="${MTU-1500}"
 
 KVM_HOST_LIBVIRT_EXTRA_DISK="${LIBVIRT_POOL_DISK}"
-KVM_HOST_LIBVIRT_DIR="{LIBVIRT_DIR}"
+KVM_HOST_LIBVIRT_DIR="${LIBVIRT_DIR}"
 
 KVM_HOST_MASK_PREFIX="${KVM_HOST_MASK_PREFIX:-$NETMASK_PREFIX}"
 
@@ -98,27 +100,23 @@ QCOW_RHEL8_CHECKSUM="321c20a732419472ba584ea34cd2cab79db2ea1790abe467ea3c0e2ca52
 QCOW_RHEL7_CHECKSUM="1df6c664678c0164914a426e832c0b4a1b438360075e49a288f70623915a8697"
 QCOW_RHEL7_NAME="${qcow_rhel7_name:-rhel-server-7.8-x86_64-kvm.qcow2}"
 QCOW_RHEL8_NAME="${qcow_rhel8_name:-rhel-8.3-x86_64-kvm.qcow2}" 
+RHEL8_VM_VERSION="8.3"
+RHEL7_VM_VERSION="7.8"
+RHSM_TOKEN="${project_dir}/rhsm_token"
+RHSM_CLI_DOC_URL="https://github.com/Qubinode/qubinode-installer/tree/master/docs#getting-the-rhel-7-or-8-qcow-image"
+QUBINODE_RHEL_VM_VARS_TEMPLATE="${project_dir}/samples/qubinode_rhel_vm.txt"
+
 RHEL_VM_DEFAULT_RELEASE="8"
 RHEL_VM_DEFAULT_QCOW_IMG="${rhel_vm_qcow_image:-$QCOW_RHEL8_NAME}"
 RHEL_VM_DEFAULT_QCOW_IMG_CHECKSUM="${rhel_qcow_image_checksum:-$QCOW_RHEL8_CHECKSUM}"
-rhel_server_vm=
-    rhel_name="${rhel_vm_hostname:-''}"
-    rhel_vcpu="${rhel_vm_vcpu:-''}"
-    rhel_memory="${rhel_vm_memory:-''}"
-    rhel_root_disk_size="${rhel_vm_disk:-''}"
-    rhel_teardown=false
-    rhel_recreate=false
-    rhel_group=rhel
-    rhel_extra_storage=
-      pdashpsize=''
-        enable=false
-    rhel_enable=true
-
+RHEL_VM_OS_VERSION="${RHEL8_VM_VERSION}"
+#RHEL_VM_OS_RELEASE="${RHEL_VM_OS_VERSION}"
+CLOUD_INIT_VM_IMAGE="${RHEL_VM_DEFAULT_QCOW_IMG}"
+RHEL_VM_QCOW_IMAGE_FILE="${rhel_vm_qcow_image_file:-none}"
 RHEL_VM_RELEASE="${rhel_vm_major_release:-8}"
 RHEL_VM_QCOW_RHEL_RELEASE="${RHEL_VM_RELEASE}"
 RHEL_VM_OS_RELEASE="${RHEL_VM_RELEASE}"
-RHSM_TOKEN="${project_dir}/rhsm_token"
-RHSM_CLI_DOC_URL="https://github.com/Qubinode/qubinode-installer/tree/master/docs#getting-the-rhel-7-or-8-qcow-image"
+KVM_VM_POOL_DIR="${LIBVIRT_DIR}"
 
 
 
@@ -149,3 +147,6 @@ RHEL8_REPOS="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansi
 
 OCP_TOKEN="${project_dir}/ocp_token"
 PULL_SECRET="${project_dir}/pull-secret.txt"
+
+AVAILABLE_PRODUCTS="rhel,tower,satellite,ocp4,okd4"
+RHEL_PLAYBOOK="${project_dir}/playbooks/rhel.yml"
