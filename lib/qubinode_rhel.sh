@@ -38,15 +38,14 @@ function qubinode_rhel_vm_attributes () {
             if [ -f "${project_dir:?}/.rhel/${name}.yml" ]
             then
                 rhel_vm_hostname="${name}"
-            else
-                rhel_vm_hostname="${name_prefix}-${name}"
-            fi
-
-            if echo "${name}" | grep -q "${name_prefix}"
+            elif sudo virsh list --all | grep -qo "${name}"
+            then
+                rhel_vm_hostname="${name}"
+            elif echo "${name}" | grep -q "${name_prefix}"
             then
                 rhel_vm_hostname="${name}"
             else
-                rhel_vm_hostname="${name_prefix}-${name}${num}"
+                rhel_vm_hostname="${name_prefix}-${name}"
             fi
         else
             rhel_vm_hostname="${name_prefix}-${suffix}${rhel_vm_major_release}-${instance_id}"
@@ -343,11 +342,10 @@ function qubinode_deploy_rhel () {
                     if [ -f "${project_dir:?}/.rhel/${name}.yml" ]
                     then
                         rhel_vm_hostname="${name}"
-                    else
-                        rhel_vm_hostname="${name_prefix}-${name}${num}"
-                    fi
-
-                    if echo "${name}" | grep -q "${name_prefix}"
+                    elif sudo virsh list --all | grep -qo "${name}"
+                    then
+                        rhel_vm_hostname="${name}"
+                    elif echo "${name}" | grep -q "${name_prefix}"
                     then
                         rhel_vm_hostname="${name}"
                     else
@@ -366,37 +364,59 @@ function qubinode_deploy_rhel () {
 }
 
 function qubinode_rhel_teardown () {
-    ## Run the qubinode_rhel_vm_attributes function to gather required variables
-    qubinode_rhel_vm_attributes 
 
-    if [ "A${name}" == "A" ]
+    local rhel_vm_playbook_vars
+    local rhel_vm_bash_vars
+    local rhel_vm_playbook="${RHEL_PLAYBOOK:?}"
+    local rhel_vm_deleted=no
+
+    if [ "${name:-none}" == "none" ]
     then
-        echo "Please specify the name of the instance to delete"
-        echo "Example: ./qubinode-install -p rhel -a name=qbn-rhel8-348 -d"
+        printf "%s\n" ""
+        printf "%s\n" "Please specify the name of the instance to delete"
+        printf "%s\n" "Example: ${blu:?}./qubinode-install -p rhel -a name=qbn-rhel8-348 -d${end:?}"
         exit
     fi
 
-    PLAYBOOK="${project_dir}/.rhel/${name}-playbook.yml"
-    VARS_FILE="${project_dir}/.rhel/${name}-vars.yml"
+    rhel_vm_playbook_vars="${project_dir}/.rhel/${name}.yml"
+    rhel_vm_bash_vars="${project_dir}/.rhel/${name}.txt"
 
-    if sudo virsh dominfo "${name}" >/dev/null 2>&1
+    if [ -f "${rhel_vm_playbook_vars}" ]
     then
-        echo "removing $name"
-        ansible-playbook "${RHEL_VM_PLAY}" --extra-vars "vm_teardown=true" -e @"${VARS_FILE}"
-        RESULT=$?
-
-	echo "RESULT=$RESULT"
-	delete_vm_vars_file
-        if [ "A${VM_DELETED}" == "Ayes" ]
+        printf "%s\n" ""
+        printf "%s\n" "Running playbook to delete ${blu:?}${name}${end:?}"
+        if ansible-playbook "${rhel_vm_playbook}" --extra-vars "@${rhel_vm_playbook_vars}" -e "vm_teardown=yes"
         then
-            printf "\n\n"
-            printf "  * VM $name deleted *\n"
+            rhel_vm_deleted=yes
+            test -f "${rhel_vm_playbook_vars}" && rm -f "${rhel_vm_playbook_vars}"
+            test -f "${rhel_vm_bash_vars}" && rm -f "${rhel_vm_bash_vars}" 
+        else
+            printf "%s\n" "Playbook run to delete ${blu:?}${name}${end:?} failed"
         fi
-    else 
-        echo "The VM $name does not exist"
-        printf "\n\n"
-        printf "  The VM $name does not exit\n"
+    elif sudo virsh list --all | grep -q "${name}"
+    then
+        printf "%s\n" ""
+        if sudo virsh list --state-running | grep -oq "${name}"
+        then
+            printf "%s\n" "Shutting down VM ${blu:?}${name}${end:?}"
+            sudo virsh destroy --domain "${name}"
+        fi
+
+        printf "%s\n" "Deleting VM ${blu:?}${name}${end:?}"
+        if sudo virsh undefine --remove-all-storage --domain "${name}"
+        then
+            rhel_vm_deleted=yes
+        else
+            printf "%s\n" "Unable to delete VM ${blu:?}${name}${end:?}"
+        fi
     fi
+
+    if [ "${rhel_vm_deleted}" == "yes" ]
+    then
+        printf "%s\n" ""
+        printf "%s\n" "Sucuessflly deleted VM ${blu:?}${name}${end:?}" 
+    fi  
+
 }
 
 function qubinode_rhel_maintenance () {

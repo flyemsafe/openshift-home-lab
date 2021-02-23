@@ -14,7 +14,7 @@
 # Check if the current user is root.
 # @exitcode 0 if root user
 function is_root () {
-    return $(id -u)
+    return "$(id -u)"
 }
 
 #@description
@@ -22,9 +22,10 @@ function is_root () {
 # If the agruments -s-p where pass to the installer. The '-' between s and p
 # will not be use as a value of s. 
 function check_args () {
-    if [[ $OPTARG =~ ^-[p/c/h/d/a/v/m]$ ]]
+    local cli_args="$1"
+    if [[ "$cli_args" =~ ^-[p/c/h/d/a/v/m]$ ]]
     then
-      echo "Invalid option argument $OPTARG, check that each argument has a value." >&2
+      echo "Invalid option argument $cli_args, check that each argument has a value." >&2
       exit 1
     fi
 }
@@ -1772,28 +1773,27 @@ function qubinode_product_deployment () {
     case $qubinode_product in
         rhel)
             load_qubinode_vars
-            if [ "A${QUBINODE_BASELINE_COMPLETE:-no}" != 'Ayes' ]
+            if [ "${QUBINODE_BASELINE_COMPLETE:-no}" != 'yes' ]
             then
                 cd "${project_dir}" || exit 1
                 ./qubinode-installer -m setup
             fi
-            echo "qubinode_product=$qubinode_product"
-            echo "product_maintenance=$product_maintenance"
-            echo "product_modifiers=${product_options[*]}"
-            echo "teardown=$teardown"
+
             # shellcheck source=/dev/null
             # shellcheck disable=SC1091
             source "${project_dir}/lib/qubinode_rhel.sh"
-
             qubinode_rhel_vm_attributes
-            qcow_image_exist
-            #qubinode_vars
-            generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
-            qubinode_deploy_rhel
-            echo "vm_rhel_release=${vm_rhel_release:-none}"
-            echo "rhel_vm_hostname=${rhel_vm_hostname:-none}"
-            echo "rhel_vm_size=${rhel_vm_size:-none}"
-            echo "rhel_vm_release=${rhel_vm_release:-none}"
+            if [ "${teardown:-no}" == "yes" ]
+            then
+                qubinode_rhel_teardown          
+            else
+                qcow_image_exist
+                generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
+                qubinode_deploy_rhel
+            fi
+
+
+
 
             #if [ "A${teardown}" == "Atrue" ]
             #then

@@ -150,3 +150,5 @@ PULL_SECRET="${project_dir}/pull-secret.txt"
 
 AVAILABLE_PRODUCTS="rhel,tower,satellite,ocp4,okd4"
 RHEL_PLAYBOOK="${project_dir}/playbooks/rhel.yml"
+
+INVENTORY_DIR="${QUBINODE_PROJECT_DIR}/inventory"

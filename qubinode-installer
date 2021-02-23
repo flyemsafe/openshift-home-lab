@@ -209,8 +209,9 @@ function generate_qubinode_vars () {
     local generated_bash_vars="${2:?}"
     local ansible_vars_template="${3:?}"
     local generated_ansible_vars="${4:?}"
-   
-    ## Generate an updated bash vars file
+
+     
+    ## Generate an updated bash vars file   
     template="$(cat "${bash_vars_template}")"
     template=$(sed 's/\([^\\]\)"/\1\\"/g; s/^"/\\"/g' <<< "$template")
     eval "echo \"${template}\"" > "${generated_bash_vars}"
@@ -308,37 +309,37 @@ function main ()
     do
         case $opt in
             a) 
-	            check_args;
+	            check_args "${OPTARG:-none}"
                 full_deploy=true
                 product_options+=("$OPTARG")
                 ;;
             c) 
-	           check_args
+	           check_args "${OPTARG:-none}"
                check=true
                cluster=true
-               cluster_opt=$OPTARG
+               cluster_opt="${OPTARG:-none}"
                ;;
             d) 
-	           check_args;
-               teardown=true
+	           check_args "${OPTARG:-none}"
+               export teardown=yes
                ;;
             h) 
 	           display_help
                exit 1
                ;;
             m) 
-	           check_args;
+	           check_args "${OPTARG:-none}"
                qubinode_maintenance=true
                qubinode_maintenance_opt=$OPTARG;
                ;;
             p) 
-	           check_args
+	           check_args "${OPTARG:-none}"
                check=true
                qubinode_product=true
                qubinode_product_opt=$OPTARG
                ;;
             v) 
-	            check_args;
+	            check_args "${OPTARG:-none}"
                _V=1
                ;;
            --) 
