@@ -8,6 +8,7 @@ rhel_vm_qcow_image_file="${rhel_vm_qcow_image_file:-none}"
 os_variant="rhel${RHEL_VERSION}"
 vm_gateway="${GATEWAY}"
 inventory_file="${INVENTORY_DIR}/hosts"
+vm_qcow_image="{{ cloud_init_vm_image }}"
 
 rhel_server_vm=
     rhel_name="${rhel_vm_hostname:-''}"

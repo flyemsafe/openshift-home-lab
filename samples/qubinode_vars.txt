@@ -3,7 +3,7 @@ CONFIRM_USER_DOMAIN="${CONFIRM_USER_DOMAIN:-yes}"
 CONFIRM_NETWORKING="${CONFIRM_NETWORKING:-yes}"
 CONFIRM_LIBVIRT_NETWORK="${CONFIRM_LIBVIRT_NETWORK:-yes}"
 LIBVIRT_DIR_VERIFY="${LIBVIRT_DIR_VERIFY:-none}"
-CREATE_LIBVIRT_STORAGE="${create_libvirt_lvm:-yes}"
+CREATE_LIBVIRT_STORAGE="${CREATE_LIBVIRT_STORAGE:-yes}"
 
 ## none root user
 QUBINODE_ADMIN_USER="${CURRENT_USER}"
@@ -59,7 +59,9 @@ IPA_HOST="${IDM_SERVER_HOSTNAME}.${DOMAIN}"
 PRIMARY_DISK="${PRIMARY_DISK:-none}"
 LIBVIRT_DIR="${LIBVIRT_DIR:-/var/lib/libvirt/images}"
 LIBVIRT_POOL_DISK="${LIBVIRT_POOL_DISK:-none}"
-LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
+LIBVIRT_DIR_POOL_NAME="${LIBVIRT_DIR_POOL_NAME:-default}"
+LIBVIRT_POOL_STATE="active"
+LIBVIRT_POOL_AUTOSTART="yes"
 
 ##---------------------------------------------------------------------
 ## Varibles for RHSM
@@ -85,7 +87,11 @@ KVM_HOST_MTU="${MTU-1500}"
 KVM_HOST_LIBVIRT_EXTRA_DISK="${LIBVIRT_POOL_DISK}"
 KVM_HOST_LIBVIRT_DIR="${LIBVIRT_DIR}"
 
-KVM_HOST_MASK_PREFIX="${KVM_HOST_MASK_PREFIX:-$NETMASK_PREFIX}"
+KVM_HOST_MASK_PREFIX="${NETMASK_PREFIX:-24}"
+ENABLE_COCKPIT="yes"
+ENABLE_LIBVIRT_ADMIN_USER="yes"
+CONFIGURE_SHELL="yes"
+
 
 #LIBVIRT_POOL_NAME_CHECK="yes"
 #SKIP_LIBVIRT_POOL="yes"
@@ -140,7 +146,7 @@ PYTHON3_INSTALLED="${PYTHON3_INSTALLED:-none}"
 ALL_DISK="${ALL_DISK:-none}"
 ALL_INTERFACES="${ALL_INTERFACES:-none}"
 
-YUM_PACKAGES="python3-pyyaml python36 python3-pip python3-dns ansible git podman python-podman-api toolbox ipcalc"
+YUM_PACKAGES="unzip python3-pyyaml python36 python3-pip python3-dns ansible git podman python-podman-api toolbox ipcalc"
 PIP_PACKAGES="yml2json"
 RHEL8_REPOS="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
 
@@ -152,3 +158,4 @@ AVAILABLE_PRODUCTS="rhel,tower,satellite,ocp4,okd4"
 RHEL_PLAYBOOK="${project_dir}/playbooks/rhel.yml"
 
 INVENTORY_DIR="${QUBINODE_PROJECT_DIR}/inventory"
+DEFAULT_INVENTORY_FILE="${INVENTORY_DIR}/hosts"

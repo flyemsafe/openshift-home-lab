@@ -1037,15 +1037,14 @@ function ask_for_admin_user_pass () {
 # would like to dedicate a disk device for /var/lib/libivrt/images.
 function check_additional_storage () {
     getPrimaryDisk
-    create_libvirt_lvm="${CREATE_LIBVIRT_STORAGE:-yes}"
-    libvirt_pool_disk="${LIBVIRT_POOL_DISK:-none}"
-    libvirt_dir_verify="${LIBVIRT_DIR_VERIFY:-none}"
-    libvirt_dir="${LIBVIRT_DIR:-/var/lib/libvirt/images}"
-    LIBVIRT_DIR="${LIBVIRT_DIR:-$libvirt_dir}"
+    create_libvirt_storage="${CREATE_LIBVIRT_STORAGE:?}"
+    libvirt_pool_disk="${LIBVIRT_POOL_DISK:?}"
+    libvirt_dir_verify="${LIBVIRT_DIR_VERIFY:?}"
+    libvirt_dir="${LIBVIRT_DIR:?}"
+    libvirt_pool_name="${LIBVIRT_DIR_POOL_NAME:?}"
 
-    libvirt_pool_name="${LIBVIRT_DIR_POOL_NAME:-default}"
     # confirm directory for libvirt images
-    if [ "A${libvirt_dir_verify}" != "Ano" ]
+    if [ "${libvirt_dir_verify}" != "no" ]
     then
         printf "%s\n\n" ""
         printf "%s\n" "  ${blu:?}Location for Libvirt directory Pool${end:?}"
@@ -1066,7 +1065,9 @@ function check_additional_storage () {
         libvirt_dir_verify=no
     fi
 
-    if [[ "A${create_libvirt_lvm}" == "Ayes" ]] && [[ "A${libvirt_pool_disk}" == "Anone" ]]
+    echo "create_libvirt_storage=$create_libvirt_storage"
+    echo "libvirt_pool_disk=$libvirt_pool_disk"
+    if [[ "${create_libvirt_storage}" == "yes" ]] && [[ "${libvirt_pool_disk}" == "none" ]]
     then
 	    local AVAILABLE_DISKS
 	    IFS=" " read -r -a AVAILABLE_DISKS <<< "$ALL_DISK"
@@ -1097,13 +1098,8 @@ function check_additional_storage () {
         then
             disk_msg="Please select secondary disk to be used"
             confirm_menu_option "${AVAILABLE_DISKS[*]}" "$disk_msg" libvirt_pool_disk
-            LIBVIRT_POOL_DISK="$libvirt_pool_disk"
-            CREATE_LIBVIRT_STORAGE=yes
-	        create_libvirt_lvm="$CREATE_LIBVIRT_STORAGE"
-	    else
-            LIBVIRT_POOL_DISK="none"
-            CREATE_LIBVIRT_STORAGE=no
-            create_libvirt_lvm="$CREATE_LIBVIRT_STORAGE"
+        else
+            create_libvirt_storage="no"
         fi
     fi
     check_additional_storage_status="storage_done"
@@ -1111,8 +1107,12 @@ function check_additional_storage () {
 
     ## Export vars for updating qubinode_vars.txt
     export LIBVIRT_DIR="${LIBVIRT_DIR-none}"
-    export LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:-default}"
+    export LIBVIRT_DIR_POOL_NAME="${libvirt_pool_name:?}"
     export LIBVIRT_DIR_VERIFY="${libvirt_dir_verify:-none}"
+    export LIBVIRT_POOL_DISK="${libvirt_pool_disk:?}"
+    export CREATE_LIBVIRT_STORAGE="${create_libvirt_storage:?}"
+
+
 }
 
 # @description
@@ -1365,7 +1365,7 @@ function install_packages () {
     local tools_packages="ipcalc toolbox"
     local ansible_packages="ansible git"
     local podman_packages="podman python-podman-api"
-    local all_rpm_packages="$podman_packages $ansible_packages $tools_packages $python_packages"
+    local all_rpm_packages="unzip $podman_packages $ansible_packages $tools_packages $python_packages"
     local yum_packages="${YUM_PACKAGES:-$all_rpm_packages}"
     local _rhel8_repos="rhel-8-for-x86_64-baseos-rpms rhel-8-for-x86_64-appstream-rpms ansible-2-for-rhel-8-x86_64-rpms"
     local pip_packages="${PIP_PACKAGES:-yml2json}"
@@ -1699,8 +1699,8 @@ function qubinode_maintenance_options () {
             ./qubinode-installer -m setup
         fi
 	    local ansible_cmd
-        local kvmhost_vars="${project_dir}/playbooks/vars/kvm_host.yml"
-        local inventory="${project_dir}/inventory/hosts"
+        #local kvmhost_vars="${project_dir}/playbooks/vars/kvm_host.yml"
+        local inventory="${DEFAULT_INVENTORY_FILE:?}"
 
         if [ "A${tags}" != "A" ]
         then
@@ -1714,11 +1714,11 @@ function qubinode_maintenance_options () {
             printf "%s\n" "  Error: ${red:?}Could not enter ${project_dir} ${end:?}"
             exit 1
         fi
-        test -f "${kvmhost_vars}" || cp "${project_dir}/samples/kvm_host.yml" "${kvmhost_vars}"
+
         test -f "${inventory}" || cp "${project_dir}/samples/hosts" "${inventory}"
 
 
-	    if [ -f "${inventory}" ] && [ -f "${kvmhost_vars}" ]
+	    if [ -f "${inventory}" ] 
         then
             printf "%s\n" "  ${blu:?}Running Qubinode KVMHOST setup${end:?}"
             #qubinode_vars
