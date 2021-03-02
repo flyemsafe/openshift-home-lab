@@ -1377,7 +1377,7 @@ function install_packages () {
     local python3_installed="$PYTHON3_INSTALLED"
     local ansible_installed="$ANSIBLE_INSTALLED"
     local python_packages="python3-lxml python3-libvirt python3-netaddr python3-pyyaml python36 python3-pip python3-dns python-podman-api"
-    local tools_packages="ipcalc toolbox"
+    local tools_packages="ipcalc toolbox bc"
     local ansible_packages="ansible git"
     local podman_packages="podman python-podman-api"
     local all_rpm_packages="unzip $podman_packages $ansible_packages $tools_packages $python_packages"

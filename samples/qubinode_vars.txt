@@ -96,7 +96,7 @@ CONFIGURE_SHELL="yes"
 #LIBVIRT_POOL_NAME_CHECK="yes"
 #SKIP_LIBVIRT_POOL="yes"
 #RUN_STORAGE_CHECK="yes"
-#QUBINODE_INSTALLER_HOST_COMPLETED="yes"
+QUBINODE_HOST_SETUP_COMPLETE="${QUBINODE_HOST_SETUP_COMPLETE:-no}"
 #RUN_QUBINODE_SETUP="yes"
 
 ##---------------------------------------------------------------------
