@@ -1839,8 +1839,6 @@ function qubinode_product_deployment () {
                 download_files
                 qubinode_deploy_satellite
             fi
-            ;;
-
 
 
             #if [ "A${teardown}" == "Atrue" ]
@@ -1857,7 +1855,7 @@ function qubinode_product_deployment () {
             #        qubinode_deploy_rhel
             #    fi
             #fi
-            ;;
+           ;;
 #          okd4)
 #              openshift4_variables
 #              if [ "A${teardown}" == "Atrue" ]
