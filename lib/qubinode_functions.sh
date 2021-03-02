@@ -413,7 +413,8 @@ function libvirt_network_info () {
         printf "%s\n" "  Choose ${cyn:?}Specify${end:?} to enter the name of an existing"
         printf "%s\n" "  libvirt network you would like to use."
         printf "%s\n" "  Choose ${cyn:?}Continue${end:?} to proceed with creating a libvirt bridge network."
-     
+        printf "%s\n" ""
+
         confirm_menu_option "${libvirt_net_choices[*]}" "$libvirt_net_msg" libvirt_net_choice
         if [ "A${libvirt_net_choice}" == "ASpecify" ]
         then
@@ -1413,13 +1414,15 @@ function install_packages () {
             exit 0
         else
             # check if packages needs to be installed
+            printf "%s\n" "  "
             for repo in $rhel8_repos
             do
-                if ! grep -q $repo "$enabled_repos"
+                printf "%s\n" "  ${blu:?}Enabling repo $repo${end:?}"
+                if ! grep -q "$repo" "$enabled_repos"
                 then
                     if ! sudo subscription-manager repos --enable="$repo" > /dev/null 2>&1
                     then
-                        printf "%s\n" "  ${red:?}Failed to enable "$repo"${end:?}"
+                        printf "%s\n" "  ${red:?}Failed to enable $repo${end:?}"
                 	    exit 1
                     fi
                 fi
@@ -1672,7 +1675,6 @@ function qubinode_maintenance_options () {
         printf "%s\n" "  ${blu:?}Running Qubinode Setup${end:?}"
         load_qubinode_vars
         qubinode_baseline
-        #qubinode_vars
         generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
         qubinode_vault_file
     elif [ "${qubinode_maintenance_opt}" == "clean" ]
@@ -1684,7 +1686,6 @@ function qubinode_maintenance_options () {
         check_rhsm_status
         ask_user_for_rhsm_credentials
         register_system
-        #qubinode_vars
         generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
         qubinode_vault_file
     elif [ "${qubinode_maintenance_opt}" == "ansible" ]
@@ -1701,11 +1702,10 @@ function qubinode_maintenance_options () {
     elif [ "${qubinode_maintenance_opt}" == "network" ]
     then
         setup_networking
-        #qubinode_vars
         generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
     elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
     then
-        if [ "A${QUBINODE_BASELINE_COMPLETE:-no}" != 'Ayes' ]
+        if [ "${QUBINODE_BASELINE_COMPLETE:-no}" != 'yes' ]
         then
             cd "${project_dir}" || exit 1
             ./qubinode-installer -m setup
@@ -1735,7 +1735,6 @@ function qubinode_maintenance_options () {
 	    if [ -f "${inventory}" ] 
         then
             printf "%s\n" "  ${blu:?}Running Qubinode KVMHOST setup${end:?}"
-            #qubinode_vars
             generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
             qubinode_vault_file
 	        echo "${ansible_cmd}"|sh

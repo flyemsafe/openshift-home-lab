@@ -97,3 +97,6 @@ libvirt_host_storage_pools:
     state: "{{ libvirt_pool_state }}"
     autostart: "{{ libvirt_pool_autostart }}"
     path: "{{ kvm_host_libvirt_dir }}"
+
+search_domains:
+  - "{{ vm_domain }}"

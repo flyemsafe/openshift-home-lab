@@ -12,6 +12,7 @@ vm_qcow_image="{{ cloud_init_vm_image }}"
 extra_disk_size="${extra_disk_size:-400G}"
 extra_disk="${extra_disk:-no}"
 enabled_nested="${enabled_nested:-no}"
+vm_domain="${DOMAIN}"
 
 rhel_server_vm=
     rhel_name="${rhel_vm_hostname:-''}"
