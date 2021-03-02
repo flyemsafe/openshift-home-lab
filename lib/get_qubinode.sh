@@ -185,10 +185,10 @@ function main ()
     done
 
     ## set defaults
-    qubinode_config_file=""
-    qubinode_vault_file=""
-    download_qubinode=""
-    remove_qubinode=""
+    local qubinode_config_file=""
+    local qubinode_vault_file=""
+    local download_qubinode=""
+    local remove_qubinode=""
 
     # Parse short options
     OPTIND=1
@@ -203,13 +203,13 @@ function main ()
         "?") script_usage >&2; exit 1 ;;
       esac
     done
-    shift $(expr $OPTIND - 1) # remove options from positional parameters
+    shift "$(expr $OPTIND - 1)" # remove options from positional parameters
 
     # If no arguments pass, run default option to install OpenShift
     if (( "$OPTIND" == 1 ))
     then
         setup_qubinode
-    elif [ "A${qubinode_config_file}" != "A" ] && [ "A${qubinode_vault_file}" != "A" ]
+    elif [ "${qubinode_config_file:-A}" != "A" ] && [ "${qubinode_vault_file:-A}" != "A" ]
     then
         ## verify config file exist
         if [ ! -f "${qubinode_config_file}" ]

@@ -1709,8 +1709,6 @@ function qubinode_maintenance_options () {
         then
             cd "${project_dir}" || exit 1
             ./qubinode-installer -m setup
-        else 
-            ./qubinode-installer -m setup
         fi
 	    local ansible_cmd
         #local kvmhost_vars="${project_dir}/playbooks/vars/kvm_host.yml"
@@ -1718,9 +1716,19 @@ function qubinode_maintenance_options () {
 
         if [ "A${tags}" != "A" ]
         then
-            ansible_cmd="ansible-playbook ${project_dir}/playbooks/kvmhost.yml --tags $tags"
+            if ansible_cmd="ansible-playbook ${project_dir}/playbooks/kvmhost.yml --tags $tags"
+            then
+                export QUBINODE_HOST_SETUP_COMPLETE=yes
+            else
+                printf "%s\n" "  ${red:?}Error:${end:?} Playbook kvmhost.yml failed${project_dir} "
+            fi
         else
-            ansible_cmd="ansible-playbook ${project_dir}/playbooks/kvmhost.yml"
+            if ansible_cmd="ansible-playbook ${project_dir}/playbooks/kvmhost.yml"
+            then
+                export QUBINODE_HOST_SETUP_COMPLETE=yes
+            else
+                printf "%s\n" "  ${red:?}Error:${end:?} Playbook kvmhost.yml failed${project_dir} "
+            fi
         fi
 
         if ! cd "${project_dir}"
@@ -1786,10 +1794,10 @@ function qubinode_product_deployment () {
     case $qubinode_product in
         rhel)
             load_qubinode_vars
-            if [ "${QUBINODE_BASELINE_COMPLETE:-no}" != 'yes' ]
+            if [ "${QUBINODE_HOST_SETUP_COMPLETE:-no}" != 'yes' ]
             then
                 cd "${project_dir}" || exit 1
-                ./qubinode-installer -m setup
+                ./qubinode-installer -m kvmhost
             fi
 
             # shellcheck source=/dev/null
