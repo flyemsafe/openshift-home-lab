@@ -12,7 +12,7 @@ set -o pipefail         # Use last non-zero exit code in a pipeline
 
 ## Required Vars
 PROJECT_NAME="qubinode-installer"
-QUBINODE_URL="${QUBINODE_URL:-https://github.com/Qubinode/qubinode-installer}"
+QUBINODE_URL="${QUBINODE_URL:-https://github.com/Qubinode}"
 QUBINODE_BRANCH="${QUBINODE_BRANCH:-newinstaller}"
 PROJECT_DIR="$HOME/${PROJECT_NAME}"
 QUBINODE_ZIP_URL="${QUBINODE_URL}/${PROJECT_NAME}/archive"

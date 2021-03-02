@@ -638,6 +638,9 @@ function register_system () {
     ## set default rhsm system
     rhsm_system="${RHSM_SYSTEM:-no}"
     system_registered="${SYSTEM_REGISTERED:-no}"
+    rhel_pool_id="${RHEL_POOL_ID:-none}"
+    ansible_pool_id="${ANSIBLE_POOL_ID:-none}"
+    sub_service_level="${SUB_SERVICE_LEVEL:-none}"
 
     if [ "${rhsm_system}" == "none" ]
     then
@@ -664,6 +667,20 @@ function register_system () {
         RESULT="$?"
         if [ ${RESULT} -eq 0 ]
         then
+            if [ "${rhel_pool_id}" == 'none' ]
+            then
+                rhel_pool_id=$(subscription-manager list --available --consumed --matches 'Red Hat Ansible Engine' --pool-only)
+                ansible_pool_id=$(subscription-manager list --available --consumed --matches 'Red Hat Enterprise Linux Server' --pool-only)
+            fi
+
+            sub_service_level=$(subscription-manager list --available --consumed --matches 'Red Hat Enterprise Linux Server' | awk -F:  '/Service Level/ {print $2}'| awk '{ gsub(/ /,""); print }')
+            if [ "${rhel_pool_id}" == "$ansible_pool_id" ]
+            then
+                subscription-manager attach --pool="$rhel_pool_id" --servicelevel="${sub_service_level}"
+            else
+                subscription-manager attach --pool="$ansible_pool_id" --servicelevel="${sub_service_level}"
+                subscription-manager attach --pool="$rhel_pool_id" --servicelevel="${sub_service_level}"
+            fi
             verify_rhsm_status
 	        SYSTEM_REGISTERED="yes"
     	else
@@ -1065,8 +1082,7 @@ function check_additional_storage () {
         libvirt_dir_verify=no
     fi
 
-    echo "create_libvirt_storage=$create_libvirt_storage"
-    echo "libvirt_pool_disk=$libvirt_pool_disk"
+
     if [[ "${create_libvirt_storage}" == "yes" ]] && [[ "${libvirt_pool_disk}" == "none" ]]
     then
 	    local AVAILABLE_DISKS
@@ -1111,8 +1127,6 @@ function check_additional_storage () {
     export LIBVIRT_DIR_VERIFY="${libvirt_dir_verify:-none}"
     export LIBVIRT_POOL_DISK="${libvirt_pool_disk:?}"
     export CREATE_LIBVIRT_STORAGE="${create_libvirt_storage:?}"
-
-
 }
 
 # @description

@@ -9,6 +9,9 @@ os_variant="rhel${RHEL_VERSION}"
 vm_gateway="${GATEWAY}"
 inventory_file="${INVENTORY_DIR}/hosts"
 vm_qcow_image="{{ cloud_init_vm_image }}"
+extra_disk_size="${extra_disk_size:-400G}"
+extra_disk="${extra_disk:-no}"
+enabled_nested="${enabled_nested:-no}"
 
 rhel_server_vm=
     rhel_name="${rhel_vm_hostname:-''}"
@@ -19,6 +22,8 @@ rhel_server_vm=
     rhel_recreate=false
     rhel_group=rhel
     rhel_extra_storage=
-      pdashpsize=''
-        enable=false
+      pdashpsize="{{ extra_disk_size }}"
+        enable="{{ extra_disk }}"
     rhel_enable=true
+
+

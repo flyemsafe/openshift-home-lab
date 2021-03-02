@@ -62,7 +62,8 @@ function qubinode_rhel_vm_attributes () {
         fi
 
         ## Get User Requested Instance size
-        case "${rhel_vm_size:-small}" in
+        local rhel_vm_size="${size:-small}"
+        case "${rhel_vm_size}" in
             small)
                 vcpu=1
                 memory=800
@@ -80,6 +81,14 @@ function qubinode_rhel_vm_attributes () {
                 memory=8192
                 disk=60G
                 expand_os_disk=yes
+                ;;
+            xlarge)
+                vcpu=4
+                memory=16384
+                disk=60G
+                expand_os_disk=yes
+                enabled_nested=yes
+                extra_disk=yes
                 ;;
             *)
                 printf "%s\n" "The VM size ${rhel_vm_size} is not valid"
@@ -102,6 +111,8 @@ function qubinode_rhel_vm_attributes () {
         export "rhel_vm_disk=$disk"
         export "rhel_vm_expandisk=$expand_os_disk"
         export "rhel_vm_vcpu=$vcpu"
+        export "enabled_nested=${enabled_nested:-no}"
+        export "extra_disk=${extra_disk:-no}"
 
         ## Which RHEL release to deploy
         case "${rhel_vm_release:-8}" in
