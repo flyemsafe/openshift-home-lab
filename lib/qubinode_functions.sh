@@ -1813,6 +1813,13 @@ function qubinode_product_deployment () {
         ./qubinode-installer -m kvmhost
     fi
 
+    if [ ! -f "${DEFAULT_INVENTORY_FILE:?}" ]
+    then
+        cd "${project_dir}" || exit 1
+        ./qubinode-installer -m kvmhost
+    fi
+    
+
     case $qubinode_product in
         rhel)
             # shellcheck source=/dev/null
