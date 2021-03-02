@@ -103,6 +103,9 @@ function qubinode_baseline () {
     ## get the password for the admin user   
     ask_for_admin_user_pass
 
+    ## Setup admin user sshkeys
+    setup_user_ssh_key
+
     ## check sudoers status
     setup_sudoers "${admin_user_password:-none}"
 

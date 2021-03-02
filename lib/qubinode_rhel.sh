@@ -183,6 +183,7 @@ function rhsm_cli_download_rhel_qcow () {
     local rhsm_cli_cmd="${project_dir:?}/.python/rhsm_cli/bin/rhsm-cli"
     local rhsm_cli_config="/home/${ADMIN_USER:?}/.config/rhsm-cli.conf"
     local rhsm_offline_token
+    local rhsm_token_file="${RHSM_TOKEN:-none}"
 
     # save token to config file
     if [ ! -f "${rhsm_cli_config}" ]

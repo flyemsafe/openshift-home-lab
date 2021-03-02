@@ -866,6 +866,18 @@ load_qubinode_vars () {
 }
 
 # @description
+# Generate use ssh keys if none exist
+function setup_user_ssh_key () {
+    HOMEDIR=$(eval echo ~${QUBINODE_ADMIN_USER:?})
+    if [ ! -f "${HOMEDIR}/.ssh/id_rsa.pub" ]
+    then
+        printf "%s\n" " Setting up ssh keys for ${yel}${QUBINODE_ADMIN_USER:?}${end}"
+        ssh-keygen -f "${HOMEDIR}/.ssh/id_rsa" -q -N ''
+    fi
+}
+
+
+# @description
 # Read variables from ansible encrupted vault file.
 function load_vault_vars () 
 {
