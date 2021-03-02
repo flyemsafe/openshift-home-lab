@@ -335,7 +335,6 @@ function discover_host_networking () {
     #fi
 
     get_primary_interface_status="interface_done"
-    BASELINE_STATUS+=("$get_primary_interface_status")
 
     # If current interface is the qubinode bridge
     # reset it to the master link interface
@@ -377,7 +376,7 @@ function setup_networking () {
     fi
 
     export CONFIRM_NETWORKING="${confirm_networking:-yes}"
-
+    BASELINE_STATUS+=("$get_primary_interface_status")
 }
 
 # @description
@@ -874,6 +873,8 @@ function setup_user_ssh_key () {
         printf "%s\n" " Setting up ssh keys for ${yel}${QUBINODE_ADMIN_USER:?}${end}"
         ssh-keygen -f "${HOMEDIR}/.ssh/id_rsa" -q -N ''
     fi
+    check_setup_user_ssh_key="user_ssh_done"
+    BASELINE_STATUS+=("$check_setup_user_ssh_key")
 }
 
 
@@ -1060,6 +1061,8 @@ function ask_for_admin_user_pass () {
         admin_user_password="$sensitive_data"
         export ADMIN_USER_PASSWORD="${admin_user_password:-none}"
     fi
+    check_ask_for_admin_user_pass="admin_user_done"
+    BASELINE_STATUS+=("$check_ask_for_admin_user_pass")
 }
 
 # @description
@@ -1717,7 +1720,7 @@ function qubinode_maintenance_options () {
         generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
     elif [ "${qubinode_maintenance_opt}" == "kvmhost" ]
     then
-        if [ "${QUBINODE_BASELINE_COMPLETE:-no}" != 'yes' ]
+        if [ "${QUBINODE_HOST_SETUP_COMPLETE:-no}" != 'yes' ]
         then
             cd "${project_dir}" || exit 1
             ./qubinode-installer -m setup
@@ -1803,15 +1806,15 @@ function qubinode_product_deployment () {
         local tags=""
     fi
 
+    load_qubinode_vars
+    if [ "${QUBINODE_HOST_SETUP_COMPLETE:-no}" != 'yes' ]
+    then
+        cd "${project_dir}" || exit 1
+        ./qubinode-installer -m kvmhost
+    fi
+
     case $qubinode_product in
         rhel)
-            load_qubinode_vars
-            if [ "${QUBINODE_HOST_SETUP_COMPLETE:-no}" != 'yes' ]
-            then
-                cd "${project_dir}" || exit 1
-                ./qubinode-installer -m kvmhost
-            fi
-
             # shellcheck source=/dev/null
             # shellcheck disable=SC1091
             source "${project_dir}/lib/qubinode_rhel.sh"
@@ -1824,7 +1827,18 @@ function qubinode_product_deployment () {
                 generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
                 qubinode_deploy_rhel
             fi
-
+        satellite)
+            if [ "A${teardown}" == "Atrue" ]
+            then
+                qubinode_teardown_satellite
+            else
+                rhel_major=7
+                CHECK_PULL_SECRET=no
+                setup_download_options
+                download_files
+                qubinode_deploy_satellite
+            fi
+            ;;
 
 
 
@@ -1870,18 +1884,6 @@ function qubinode_product_deployment () {
 #                  CHECK_PULL_SECRET=no
 #                  setup_download_options
 #                  qubinode_deploy_ocp4
-#              fi
-#              ;;
-#          satellite)
-#              if [ "A${teardown}" == "Atrue" ]
-#              then
-#                  qubinode_teardown_satellite
-#              else
-#                  rhel_major=7
-#                  CHECK_PULL_SECRET=no
-#                  setup_download_options
-#                  download_files
-#                  qubinode_deploy_satellite
 #              fi
 #              ;;
 #          tower)
