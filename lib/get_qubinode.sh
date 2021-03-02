@@ -227,6 +227,8 @@ function main ()
 
         # download and setup
         setup_qubinode_with_config
+        cp "${qubinode_config_file}" "${QUBINODE_BASH_VARS_FILE}"
+        cp "${qubinode_vault_file}" "${QUBINODE_VAULT_FILE}"
     elif [ "A${qubinode_config_file}" != "A" ]
     then
         ## verify config file exist
@@ -235,11 +237,11 @@ function main ()
             printf '%s\n' "Error: ${qubinode_config_file} does not exist"
             exit 1
         else
+            setup_qubinode_with_config
             cp "${qubinode_config_file}" "${QUBINODE_BASH_VARS_FILE}"
         fi
 
-        # download and setup
-        setup_qubinode_with_config
+        
     elif [ "A${remove_qubinode}" == "Ayes" ]
     then
         remove_qubinode_folder
