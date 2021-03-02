@@ -259,12 +259,12 @@ function qcow_image_exist () {
     fi
 
     # Download RHEL qcow image
-    if [[ "A${download_rhel_qcow}" == "Ayes" ]] && [[ "A${rhsm_token_status}" == "Aexist" ]]
+    if [[ "${download_rhel_qcow:-no}" == "yes" ]] && [[ "${rhsm_token_status:-notexist}" == "exist" ]]
     then
-        echo "Install install_rhsm_cli"
+        #"Install install_rhsm_cli"
         install_rhsm_cli
 
-        echo "run rhsm_cli_download_rhel_qcow"
+        #echo "run rhsm_cli_download_rhel_qcow"
         rhsm_cli_download_rhel_qcow
     fi
 
