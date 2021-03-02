@@ -1827,6 +1827,7 @@ function qubinode_product_deployment () {
                 generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
                 qubinode_deploy_rhel
             fi
+            ;;
         satellite)
             if [ "A${teardown}" == "Atrue" ]
             then
