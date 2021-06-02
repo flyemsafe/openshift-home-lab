@@ -52,6 +52,12 @@ USE_IDM_STATIC_IP="${USE_IDM_STATIC_IP:-yes}"
 IDM_EXISTING_ADMIN_USER="${IDM_EXISTING_ADMIN_USER:-none}"
 IDM_DEPLOY_METHOD="${IDM_DEPLOY_METHOD:-none}"
 IPA_HOST="${IDM_SERVER_HOSTNAME}.${DOMAIN}"
+IDM_SERVER_CLEANUP_PLAYBOOK="${QUBINODE_PROJECT_DIR}/playbooks/idm_server_cleanup.yml"
+DEPLOY_IDM_SERVER_PLAYBOOK="${QUBINODE_PROJECT_DIR}/playbooks/idm_server.yml"
+IDM_DNS_FORWARDER="${IDM_DNS_FORWARDER:-1.1.1.1}"
+IDM_SERVER_PTR="${REVERSE_ZONE:?}"
+IDM_VM_INVENTORY_GROUP="ipaserver"
+IDM_VM_MAC_ADDRESS="${VM_MAC:-none}"
 
 ##---------------------------------------------------------------------
 ## Libvirt variables

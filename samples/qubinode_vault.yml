@@ -15,7 +15,7 @@ admin_user_password: ${ADMIN_USER_PASSWORD:-none}
 
 ## Idm Server
 idm_dm_pwd: ${IDM_DM_PASS:-$RANDOM_GENERATED_PASS}
-idm_admin_pwd: ${idm_admin_pwd:-$RANDOM_GENERATED_PASS}
+idm_admin_pwd: ${idm_admin_pwd:-$ADMIN_USER_PASSWORD}
 
 ## Tower Server
 tower_pg_password: ${TOWER_PG_PASS:-$RANDOM_GENERATED_PASS}

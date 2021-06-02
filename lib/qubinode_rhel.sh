@@ -152,6 +152,7 @@ function qubinode_rhel_vm_attributes () {
         else
             export vm_mask_prefix=""
             export vm_gateway=""
+            export vm_ipaddress=""
         fi
 
         ## Use netmask prefix if provided
@@ -305,7 +306,6 @@ function run_rhel_deployment () {
         export SOURCE_VARS=no
         generate_qubinode_vars "${rhel_vm_vars_template}" "${rhel_vm_bash_vars_file}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${rhel_vm_ansible_vars_file}"
 
-        echo "Deploying $rhel_vm_name"
         ansible-playbook "${RHEL_PLAYBOOK}" --extra-vars "@${rhel_vm_ansible_vars_file}"
         PLAYBOOK_STATUS=$?
         echo "PLAYBOOK_STATUS=$PLAYBOOK_STATUS"
@@ -329,7 +329,6 @@ function delete_vm_vars_file () {
 }
 
 function qubinode_deploy_rhel () {
-
     ## Check if user requested more than one VMs and deploy the requested count
     if [ "${qty:-A}" != "A" ]
     then
@@ -349,6 +348,14 @@ function qubinode_deploy_rhel () {
                     fi
                 done
 
+                if [ "${VM_MAC:-none}" == 'none' ]
+                then
+                    export VM_MAC="52:54:$(dd if=/dev/urandom count=1 2>/dev/null | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\).*$/\1:\2:\3:\4/')"
+                fi
+                if [ "${vm_ipaddress:-none}" != 'none' ]
+                then
+                    export vm_ipaddress="${vm_ipaddress}"
+                fi
                 if [ "${name:-A}" != "A" ]
                 then
                     if [ -f "${project_dir:?}/.rhel/${name}.yml" ]
@@ -371,6 +378,14 @@ function qubinode_deploy_rhel () {
             done
         fi 
     else
+        if [ "${VM_MAC:-none}" == 'none' ]
+        then
+            export VM_MAC="52:54:$(dd if=/dev/urandom count=1 2>/dev/null | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\).*$/\1:\2:\3:\4/')"
+        fi
+        if [ "${vm_ipaddress:-none}" != 'none' ]
+        then
+            export vm_ipaddress="${vm_ipaddress}"
+        fi
         run_rhel_deployment "${rhel_vm_hostname}"
     fi
 }

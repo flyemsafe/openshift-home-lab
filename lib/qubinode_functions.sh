@@ -334,7 +334,6 @@ function discover_host_networking () {
         macaddr=$(ip addr show "$netdevice" | grep link | awk '{print $2}' | head -1)
     #fi
 
-    get_primary_interface_status="interface_done"
 
     # If current interface is the qubinode bridge
     # reset it to the master link interface
@@ -376,6 +375,7 @@ function setup_networking () {
     fi
 
     export CONFIRM_NETWORKING="${confirm_networking:-yes}"
+    get_primary_interface_status="interface_done"
     BASELINE_STATUS+=("$get_primary_interface_status")
 }
 
@@ -1148,16 +1148,13 @@ function check_additional_storage () {
 # @description
 # Ask user to set a password that will be used for the IdM server.
 function ask_idm_password () {
-    idm_admin_pass="${IDM_ADMIN_PASS:=none}"
-    if [ "A${idm_admin_pass}" == "Anone" ]
-    then
-        printf "%s\n" ""
-        MSG_ONE="Enter a password for the IdM server ${cyn:?}${idm_server_hostname}${end:?} ${blu:?}[ENTER]${end:?}:"
-        MSG_TWO="Enter a password again for the IdM server ${cyn:?}${idm_server_hostname}${end:?} ${blu:?}[ENTER]${end:?}:"
-        accept_sensitive_input
-        # shellcheck disable=SC2034
-        idm_admin_pwd="${sensitive_data}"
-    fi
+    local idm_admin_pass
+    printf "%s\n" ""
+    MSG_ONE="Enter a password for the IdM server ${cyn:?}${idm_server_hostname}${end:?} ${blu:?}[ENTER]${end:?}:"
+    MSG_TWO="Enter a password again for the IdM server ${cyn:?}${idm_server_hostname}${end:?} ${blu:?}[ENTER]${end:?}:"
+    accept_sensitive_input
+    # shellcheck disable=SC2034
+    idm_admin_pwd="${sensitive_data}"
 }
 
 # @description
@@ -1835,7 +1832,50 @@ function qubinode_product_deployment () {
                 qubinode_deploy_rhel
             fi
             ;;
+        idm)
+            local idm_vm_mac="${IDM_VM_MAC_ADDRESS:-none}"
+            export VM_INVENTORY_GROUP="${IDM_VM_INVENTORY_GROUP:-ipaserver}"
+
+            if [ "${idm_vm_mac}" == 'none' ]
+            then
+                export VM_MAC="52:54:$(dd if=/dev/urandom count=1 2>/dev/null | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\).*$/\1:\2:\3:\4/')"
+            else
+                export VM_MAC="${idm_vm_mac}"
+            fi
+
+            # this list will contain all vm options
+            declare -a vm_deployment_options=()
+            vm_deployment_options+="-a name=$IDM_SERVER_HOSTNAME"
+
+            if [ "${IDM_SERVER_IP:-none}" == 'none' ]
+            then
+                export CONVERT_DHCP_TO_STATIC="yes"
+            else 
+                export vm_ipaddress="${IDM_SERVER_IP:?}"
+                vm_deployment_options+="-a ip=$vm_ipaddress"
+            fi 
+
+            if [ "${teardown:-no}" == "yes" ]
+            then
+                #qubinode_teardown_idm
+                ./qubinode-installer -p rhel "${vm_deployment_options}" -d      
+            else
+                generate_qubinode_vars "${QUBINODE_BASH_VARS_TEMPLATE}" "${QUBINODE_BASH_VARS}" "${QUBINODE_ANSIBLE_VARS_TEMPLATE}" "${QUBINODE_ANSIBLE_VARS}"
+                if ./qubinode-installer -p rhel "${vm_deployment_options}"
+                then
+                   echo "Deploy IdM Server"
+                fi
+            fi
+            ;;
         satellite)
+            if [ "${teardown:-no}" == "yes" ]
+            then
+                qubinode_satellite_teardown          
+            else
+                ./qubinode-installer -p rhel -a name=qbn-rhel8-3964 -a size=sat
+
+            fi
+
             if [ "A${teardown}" == "Atrue" ]
             then
                 qubinode_teardown_satellite
